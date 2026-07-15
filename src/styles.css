@@ -16,6 +16,9 @@
     "Segoe UI",
     Roboto,
     sans-serif;
+  /* Render native controls (select dropdowns, date pickers) in dark mode so
+     their text stays legible against the dark theme. */
+  color-scheme: dark;
 }
 
 * {
@@ -342,6 +345,10 @@ select {
 select:focus {
   outline: none;
   border-color: var(--teal);
+}
+select option {
+  background: var(--panel-2);
+  color: var(--text);
 }
 button.small {
   padding: 0.45rem 0.8rem;
