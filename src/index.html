@@ -2,38 +2,146 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <title>CRAcked</title>
+    <link rel="stylesheet" href="styles.css" />
     <script type="module" src="/main.js" defer></script>
   </head>
-
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
-
-      <div class="row">
-        <a href="https://tauri.app" target="_blank">
-          <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a
-          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-          target="_blank"
-        >
-          <img
-            src="/assets/javascript.svg"
-            class="logo vanilla"
-            alt="JavaScript logo"
-          />
-        </a>
+    <header class="app-header">
+      <img src="/assets/logo.png" alt="CRAcked" class="logo" />
+      <div class="titles">
+        <h1>CRA<span class="accent">cked</span></h1>
+        <p class="tagline">Contribution Room, Cracked. — <em>Claw it back. Legally.</em></p>
       </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
+    </header>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
+    <nav class="tabs">
+      <button class="tab active" data-account="RRSP">RRSP</button>
+      <button class="tab" data-account="TFSA" disabled title="Coming soon">TFSA</button>
+      <button class="tab" data-account="FHSA" disabled title="Coming soon">FHSA</button>
+    </nav>
+
+    <main>
+      <!-- Headline cards -->
+      <section class="cards">
+        <div class="card headline">
+          <span class="card-label">Contribution room left</span>
+          <span class="card-value" id="current-room">—</span>
+        </div>
+        <div class="card">
+          <span class="card-label">Total contributed</span>
+          <span class="card-value" id="total-contributed">—</span>
+        </div>
+        <div class="card" id="over-card" hidden>
+          <span class="card-label">⚠️ Over-contribution</span>
+          <span class="card-value warn" id="over-amount">—</span>
+        </div>
+      </section>
+
+      <div id="warnings" class="warnings"></div>
+
+      <!-- Year-by-year breakdown -->
+      <section class="panel">
+        <h2>Year-by-year room</h2>
+        <div class="table-wrap">
+          <table id="year-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th class="num">Opening room</th>
+                <th class="num">New room</th>
+                <th class="num">Available</th>
+                <th class="num">Contributed</th>
+                <th class="num">Closing room</th>
+              </tr>
+            </thead>
+            <tbody id="year-body">
+              <tr><td colspan="6" class="empty">No data yet — add income and contributions below.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="two-col">
+        <!-- Annual income -->
+        <section class="panel">
+          <h2>Annual earned income</h2>
+          <p class="hint">Income earned in a year drives the <strong>next</strong> year's RRSP room (18% of it, up to the annual cap).</p>
+          <form id="income-form" class="stack">
+            <label>Year
+              <input type="number" id="income-year" min="1990" max="2100" placeholder="2023" required />
+            </label>
+            <label>Earned income ($)
+              <input type="number" id="income-amount" min="0" step="0.01" placeholder="65000" required />
+            </label>
+            <label>Pension adjustment ($) <span class="muted">— optional, from your T4</span>
+              <input type="number" id="income-pa" min="0" step="0.01" placeholder="0" />
+            </label>
+            <button type="submit">Save income</button>
+          </form>
+          <ul id="income-list" class="mini-list"></ul>
+        </section>
+
+        <!-- Contributions -->
+        <section class="panel">
+          <h2>Add a contribution</h2>
+          <form id="contrib-form" class="stack">
+            <label>Tax year
+              <input type="number" id="contrib-year" min="1990" max="2100" placeholder="2024" required />
+            </label>
+            <label>Date
+              <input type="date" id="contrib-date" required />
+            </label>
+            <label>Amount ($)
+              <input type="number" id="contrib-amount" min="0" step="0.01" placeholder="5000" required />
+            </label>
+            <label>Note <span class="muted">— optional</span>
+              <input type="text" id="contrib-note" placeholder="e.g. year-end top-up" />
+            </label>
+            <button type="submit">Add contribution</button>
+          </form>
+        </section>
+      </div>
+
+      <!-- Contribution log -->
+      <section class="panel">
+        <h2>Contribution log</h2>
+        <div class="table-wrap">
+          <table id="contrib-table">
+            <thead>
+              <tr>
+                <th>Tax year</th>
+                <th>Date</th>
+                <th class="num">Amount</th>
+                <th>Note</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="contrib-body">
+              <tr><td colspan="5" class="empty">No contributions logged yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="panel">
+        <h2>Starting room</h2>
+        <p class="hint">Unused RRSP room you carried in <em>before</em> the earliest year you track here (from your CRA Notice of Assessment). Leave at $0 if starting fresh.</p>
+        <form id="opening-form" class="inline">
+          <label>Opening unused room ($)
+            <input type="number" id="opening-room" min="0" step="0.01" placeholder="0" />
+          </label>
+          <button type="submit">Save</button>
+        </form>
+      </section>
+
+      <p class="disclaimer">
+        CRAcked is a personal tracking tool, not tax advice. Contribution rules and dollar
+        limits are set by the CRA and change over time — always verify against your CRA
+        My Account.
+      </p>
     </main>
   </body>
 </html>
