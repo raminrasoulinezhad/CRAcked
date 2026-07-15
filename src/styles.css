@@ -301,6 +301,78 @@ code {
   margin-top: 1rem;
   flex-wrap: wrap;
 }
+
+/* ---- Google Drive setup guide ---- */
+.steps {
+  margin: 0 0 1.2rem;
+  padding-left: 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.steps li {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.step-title {
+  display: block;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.15rem;
+}
+.step-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.83rem;
+  margin-top: 0.3rem;
+}
+.copy-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0.1rem;
+}
+.copy-row .cmd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  color: var(--gold);
+}
+.copy-btn {
+  background: transparent;
+  color: var(--teal);
+  border: 1px solid var(--teal-dim);
+  padding: 0.28rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.copy-btn:hover {
+  border-color: var(--teal);
+}
+.copy-btn.copied {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+form.inline.stacked {
+  align-items: flex-start;
+}
+.field-help {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 17rem;
+}
+.dest-preview {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0.9rem 0 0;
+}
+.dest-preview code {
+  color: var(--gold);
+}
 button.secondary {
   background: transparent;
   color: var(--teal);

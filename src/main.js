@@ -406,6 +406,48 @@ async function refreshBackupSettings() {
   document.querySelector("#backup-status").textContent = s.enabled
     ? "Google Drive backup is configured."
     : "Google Drive not configured — local git history only.";
+  updateBackupDestPreview();
+}
+
+/** Show where a backup will land, mirroring the backend's `remote:folder`
+ * destination — so the user can see the effect of the two boxes before saving. */
+function updateBackupDestPreview() {
+  const el = document.querySelector("#backup-dest-preview");
+  if (!el) return;
+  const remote = document.querySelector("#backup-remote").value.trim();
+  const folder = document.querySelector("#backup-folder").value.trim() || "CRAcked";
+  if (remote) {
+    el.innerHTML = `Backs up to <code>${escapeHtml(remote)}:${escapeHtml(folder)}</code> in your Google Drive.`;
+  } else {
+    el.textContent =
+      "No remote set yet — enter your rclone remote above to enable Drive backup. Local git history keeps working either way.";
+  }
+}
+
+/** Copy text to the clipboard, with a legacy fallback for older WebViews. */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to the legacy path below
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "absolute";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 // ---- wiring ----------------------------------------------------------------
@@ -602,6 +644,22 @@ async function init() {
       folder: f.querySelector("#backup-folder").value || "CRAcked",
     });
     await refreshBackupSettings();
+  });
+  // Live-update the "backs up to remote:folder" preview as the boxes change.
+  document.querySelector("#backup-remote").addEventListener("input", updateBackupDestPreview);
+  document.querySelector("#backup-folder").addEventListener("input", updateBackupDestPreview);
+  // Copy buttons on the setup commands (with brief "Copied!" feedback).
+  document.querySelectorAll(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const ok = await copyText(btn.dataset.copy || "");
+      const original = btn.textContent;
+      btn.textContent = ok ? "Copied!" : "Copy failed";
+      btn.classList.toggle("copied", ok);
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.classList.remove("copied");
+      }, 1500);
+    });
   });
   document.querySelector("#backup-now-btn").addEventListener("click", async () => {
     const status = document.querySelector("#backup-status");
