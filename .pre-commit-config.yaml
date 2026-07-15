@@ -56,3 +56,11 @@ repos:
         types: [rust]
         pass_filenames: false
         stages: [pre-push]
+
+      - id: vitest
+        name: vitest (frontend unit + e2e)
+        entry: bash -c 'npm test'
+        language: system
+        files: '^(src/.*\.(js|html)|package(-lock)?\.json|vitest\.config\.js)$'
+        pass_filenames: false
+        stages: [pre-push]

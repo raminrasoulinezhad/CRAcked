@@ -11,11 +11,14 @@
 // than `800_000` for financial code. Opt out of clippy's grouping lint.
 #![allow(clippy::inconsistent_digit_grouping)]
 
-mod backup;
-mod db;
-mod fhsa;
-mod rrsp;
-mod tfsa;
+// These modules are `pub` so the out-of-crate integration test suite
+// (`tests/integration.rs`) can drive the storage + rule-engine stack exactly
+// the way the Tauri commands below do. They are not part of a stable public API.
+pub mod backup;
+pub mod db;
+pub mod fhsa;
+pub mod rrsp;
+pub mod tfsa;
 
 use backup::{BackupConfig, BackupReport};
 use db::{AnnualIncome, Person};

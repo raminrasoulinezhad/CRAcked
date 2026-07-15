@@ -1,4 +1,9 @@
-const { invoke } = window.__TAURI__.core;
+// Access the Tauri bridge lazily (per call) rather than destructuring it at
+// import time. That keeps this module importable in a plain DOM/test harness
+// (e.g. jsdom) where `window.__TAURI__` is a mock injected before `init()` runs.
+function invoke(...args) {
+  return window.__TAURI__.core.invoke(...args);
+}
 
 const currentYear = new Date().getFullYear();
 
@@ -414,7 +419,7 @@ function onSubmit(id, handler) {
     });
 }
 
-window.addEventListener("DOMContentLoaded", async () => {
+async function init() {
   // Tabs
   document
     .querySelectorAll(".tab")
@@ -623,4 +628,26 @@ window.addEventListener("DOMContentLoaded", async () => {
   await refreshPersons();
   await refreshBackupSettings();
   switchTo("RRSP");
-});
+}
+
+// Real app: wire everything once the DOM is parsed. Tests import this module
+// and call `init()` directly against a prepared DOM instead.
+window.addEventListener("DOMContentLoaded", init);
+
+// Exported for the test suite (unit tests on the pure helpers; the jsdom
+// end-to-end test drives `init()` and the refresh functions). Harmless in the
+// browser, where nothing imports this module.
+export {
+  toCents,
+  fmt,
+  escapeHtml,
+  closingClass,
+  yearElapsedFraction,
+  init,
+  switchTo,
+  refreshPersons,
+  refreshRrsp,
+  refreshTfsa,
+  refreshFhsa,
+  refreshBackupSettings,
+};

@@ -100,7 +100,8 @@ Prerequisites: Rust ≥ 1.77, Node, and the Tauri Linux system libraries
 
 ```bash
 cd src-tauri && cargo tauri dev     # dev run
-cd src-tauri && cargo test          # tests
+cd src-tauri && cargo test          # Rust unit + integration tests
+npm ci && npm test                  # frontend unit + e2e tests (vitest/jsdom)
 ./scripts/fetch-rclone.sh           # grab the rclone sidecar, then:
 cd src-tauri && cargo tauri build   # build an installer for this OS
 ```
@@ -113,13 +114,14 @@ follow the one-time setup in [`BACKUP.md`](BACKUP.md).
 All enforced identically by **pre-commit** (locally) and **GitHub Actions**
 (`.github/workflows/ci.yml`) — nothing merges that fails these:
 
-| Check         | Command                                          |
-| ------------- | ------------------------------------------------ |
-| Rust format   | `cargo fmt --check` (config: `rustfmt.toml`)     |
-| Rust lint     | `cargo clippy --all-targets -- -D warnings`      |
-| Rust tests    | `cargo test` (runs on push / in CI)              |
-| Frontend/docs | `npx prettier --check .` (config: `.prettierrc`) |
-| File hygiene  | trailing whitespace, EOF, YAML/JSON/TOML, etc.   |
+| Check          | Command                                                 |
+| -------------- | ------------------------------------------------------- |
+| Rust format    | `cargo fmt --check` (config: `rustfmt.toml`)            |
+| Rust lint      | `cargo clippy --all-targets -- -D warnings`             |
+| Rust tests     | `cargo test` — unit + integration (push / CI)           |
+| Frontend tests | `npm test` — vitest unit + jsdom e2e (push / CI)        |
+| Frontend/docs  | `npm run format:check` (prettier, config `.prettierrc`) |
+| File hygiene   | trailing whitespace, EOF, YAML/JSON/TOML, etc.          |
 
 One-time setup for contributors:
 
@@ -134,11 +136,34 @@ Money is stored in integer **cents** everywhere, written with a deliberate
 are pure and fully unit-tested; the CRA limit tables are guarded by tests that
 assert the exact published figures.
 
+## Testing
+
+Three tiers, all run in CI (`.github/workflows/ci.yml`) and on `git push` via
+pre-commit:
+
+| Tier            | Where                                                          | What it covers                                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unit**        | `#[cfg(test)]` in each `*.rs`; `src/__tests__/helpers.test.js` | Rule engines on hand-built inputs; the CRA limit-table guards; pure JS helpers (`toCents`, `fmt`, …).                                                                                     |
+| **Integration** | `src-tauri/tests/integration.rs`                               | The whole Rust backend the way the Tauri commands drive it: real (in-memory) SQLite → `db` writes → `*_year_data` shaping → engine `compute` → the numbers the UI shows.                  |
+| **E2E**         | `src/__tests__/app.e2e.test.js`                                | The frontend end-to-end in jsdom: real `index.html` markup + a mocked Tauri IPC bridge, driving `init()` and user actions (form submits, tab switches) and asserting on the rendered DOM. |
+
+```bash
+cd src-tauri && cargo test   # Rust unit + integration
+npm test                     # frontend unit + e2e (vitest run)
+npm run test:watch           # vitest in watch mode while developing the UI
+```
+
+The frontend e2e stops at the IPC boundary (it mocks `invoke`) rather than
+launching a real WebView — it needs no display server, so it stays fast and
+non-flaky in CI. A full WebDriver-driven run of the packaged app
+(`tauri-driver`) is a possible future addition on top of this.
+
 ## Status
 
 🚧 Active development. **All three accounts (RRSP, TFSA, FHSA) are implemented**
 with per-family-member tracking, room calculation, over-contribution warnings,
-and local + Google Drive backup. 53 Rust tests; CI + pre-commit enforced.
+and local + Google Drive backup. 63 Rust tests (unit + integration) and 13
+frontend tests (unit + jsdom e2e); CI + pre-commit enforced.
 
 ## Disclaimer
 
