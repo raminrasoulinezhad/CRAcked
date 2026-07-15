@@ -28,4 +28,3 @@ build/
 
 # Bundled rclone sidecar binaries — fetched by scripts/fetch-rclone.sh, not committed
 src-tauri/binaries/
-

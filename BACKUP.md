@@ -6,7 +6,7 @@ CRAcked keeps your data safe with two layers:
    writes a plain-text `snapshot.json` and commits it, so you have the complete,
    tamper-evident version history right on your machine. This needs no setup.
 2. **Google Drive mirror (append-only)** — the whole repo is copied to Google
-   Drive using `rclone copy`. Because it's *copy* and never *sync*, deleting a
+   Drive using `rclone copy`. Because it's _copy_ and never _sync_, deleting a
    file locally can **never** delete it from Drive. This layer is optional and
    takes a one-time setup below.
 
@@ -37,7 +37,7 @@ rclone config
 Answer the prompts:
 
 - `n` → **New remote**
-- name → **`gdrive`**  (remember this name — you'll type it into the app)
+- name → **`gdrive`** (remember this name — you'll type it into the app)
 - storage → choose the number for **Google Drive** (`drive`)
 - `client_id` / `client_secret` → leave blank (press Enter) — uses rclone's default
 - `scope` → choose **`1`** (full access) or **`3`** (drive.file — access only to
@@ -92,7 +92,7 @@ Drive in the background.
 - **No encryption**: data is stored on Google Drive as-is (your choice — no
   password to manage). Anyone with access to that Drive folder can read it.
 - **Append-only**: `rclone copy` never deletes on the destination, so the Drive
-  copy survives local deletion. (Google Drive's own trash/versioning is *not*
+  copy survives local deletion. (Google Drive's own trash/versioning is _not_
   relied upon — the durable history is the git repo itself.)
 - **Inspect history any time**:
 

@@ -128,7 +128,12 @@ mod tests {
     }
 
     fn year(y: i32, contribution: Cents) -> YearData {
-        YearData { year: y, open: true, contribution, withdrawal: 0 }
+        YearData {
+            year: y,
+            open: true,
+            contribution,
+            withdrawal: 0,
+        }
     }
 
     #[test]
@@ -191,7 +196,12 @@ mod tests {
     #[test]
     fn years_before_opening_grant_nothing() {
         let years = vec![
-            YearData { year: 2022, open: false, contribution: 0, withdrawal: 0 },
+            YearData {
+                year: 2022,
+                open: false,
+                contribution: 0,
+                withdrawal: 0,
+            },
             year(2023, 0),
         ];
         let r = compute(&years, 2023);
@@ -207,5 +217,61 @@ mod tests {
         let r = compute(&years, 2023);
         assert!(!r[0].past_participation_window);
         assert!(r.last().unwrap().past_participation_window); // 2023 + 15 = 2038
+    }
+
+    #[test]
+    fn empty_input_produces_no_rows() {
+        assert!(compute(&[], 2023).is_empty());
+    }
+
+    #[test]
+    fn max_16000_in_a_year_with_full_carryforward() {
+        // Idle first year banks $8,000; year two allows $8,000 carry + $8,000 new.
+        let years = vec![year(2023, 0), year(2024, d(16_000))];
+        let r = compute(&years, 2023);
+        assert_eq!(r[1].available_room, d(16_000));
+        assert_eq!(r[1].closing_room, 0);
+        assert_eq!(r[1].over_contribution, 0);
+        assert_eq!(r[1].lifetime_contributed, d(16_000));
+    }
+
+    #[test]
+    fn contributing_past_lifetime_cap_is_over_contribution() {
+        // Contribute the full $8,000 for five years = $40,000 (the lifetime cap),
+        // then any 6th-year contribution has no new grant to draw on.
+        let mut years: Vec<YearData> = (2023..2028).map(|y| year(y, d(8_000))).collect();
+        years.push(year(2028, d(1_000)));
+        let r = compute(&years, 2023);
+        assert_eq!(r[4].lifetime_contributed, d(40_000));
+        assert_eq!(r[5].new_room, 0); // lifetime grant exhausted
+        assert_eq!(r[5].available_room, 0);
+        assert_eq!(r[5].over_contribution, d(1_000));
+    }
+
+    #[test]
+    fn withdrawals_do_not_restore_room() {
+        // Contribute $8,000, withdraw $5,000 the same year: room is unaffected.
+        let years = vec![YearData {
+            year: 2023,
+            open: true,
+            contribution: d(8_000),
+            withdrawal: d(5_000),
+        }];
+        let r = compute(&years, 2023);
+        assert_eq!(r[0].closing_room, 0); // withdrawal didn't add room back
+        assert_eq!(r[0].withdrawal, d(5_000));
+    }
+
+    #[test]
+    fn over_contribution_then_recovery_next_year() {
+        // Year 1: contribute $10,000 (over by $2,000). Year 2: $8,000 new grant,
+        // minus the $2,000 carried deficit -> $6,000 available.
+        let years = vec![year(2023, d(10_000)), year(2024, 0)];
+        let r = compute(&years, 2023);
+        assert_eq!(r[0].over_contribution, d(2_000));
+        assert_eq!(r[0].closing_room, d(-2_000));
+        assert_eq!(r[1].carryforward_in, d(-2_000));
+        assert_eq!(r[1].available_room, d(6_000));
+        assert_eq!(r[1].over_contribution, 0);
     }
 }

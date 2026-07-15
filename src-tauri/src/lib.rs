@@ -6,6 +6,11 @@
 //!
 //! Data is scoped per family member (`person_id`); backup is global.
 
+// Money is stored in cents and written with a deliberate "dollars‿cents"
+// digit grouping (e.g. `8_000_00` = $8,000.00), which reads far more clearly
+// than `800_000` for financial code. Opt out of clippy's grouping lint.
+#![allow(clippy::inconsistent_digit_grouping)]
+
 mod backup;
 mod db;
 mod fhsa;
@@ -179,7 +184,12 @@ fn upsert_annual_income(
     db::upsert_annual_income(
         &conn,
         person_id,
-        &AnnualIncome { year, earned_income_cents, pension_adjustment_cents, is_estimate },
+        &AnnualIncome {
+            year,
+            earned_income_cents,
+            pension_adjustment_cents,
+            is_estimate,
+        },
     )
     .map_err(to_err)?;
     auto_backup(&conn, &format!("Set {year} earned income"));
@@ -207,7 +217,11 @@ fn get_rrsp_opening_room(state: State<AppState>, person_id: i64) -> Result<Cents
 }
 
 #[tauri::command]
-fn set_rrsp_opening_room(state: State<AppState>, person_id: i64, cents: Cents) -> Result<(), String> {
+fn set_rrsp_opening_room(
+    state: State<AppState>,
+    person_id: i64,
+    cents: Cents,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(to_err)?;
     db::set_rrsp_opening_room(&conn, person_id, cents).map_err(to_err)?;
     auto_backup(&conn, "Set RRSP opening room");
@@ -215,7 +229,11 @@ fn set_rrsp_opening_room(state: State<AppState>, person_id: i64, cents: Cents) -
 }
 
 #[tauri::command]
-fn set_rrsp_dollar_limit(state: State<AppState>, year: i32, amount_cents: Cents) -> Result<(), String> {
+fn set_rrsp_dollar_limit(
+    state: State<AppState>,
+    year: i32,
+    amount_cents: Cents,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(to_err)?;
     db::upsert_rrsp_dollar_limit(&conn, year, amount_cents).map_err(to_err)?;
     auto_backup(&conn, &format!("Set RRSP dollar limit for {year}"));
@@ -244,8 +262,16 @@ fn add_contribution(
     note: String,
 ) -> Result<i64, String> {
     let conn = state.db.lock().map_err(to_err)?;
-    let id = db::add_contribution(&conn, person_id, &account, tax_year, &date, amount_cents, &note)
-        .map_err(to_err)?;
+    let id = db::add_contribution(
+        &conn,
+        person_id,
+        &account,
+        tax_year,
+        &date,
+        amount_cents,
+        &note,
+    )
+    .map_err(to_err)?;
     auto_backup(&conn, &format!("Add {account} contribution ({tax_year})"));
     Ok(id)
 }
@@ -279,8 +305,16 @@ fn add_withdrawal(
     note: String,
 ) -> Result<i64, String> {
     let conn = state.db.lock().map_err(to_err)?;
-    let id = db::add_withdrawal(&conn, person_id, &account, tax_year, &date, amount_cents, &note)
-        .map_err(to_err)?;
+    let id = db::add_withdrawal(
+        &conn,
+        person_id,
+        &account,
+        tax_year,
+        &date,
+        amount_cents,
+        &note,
+    )
+    .map_err(to_err)?;
     auto_backup(&conn, &format!("Add {account} withdrawal ({tax_year})"));
     Ok(id)
 }
@@ -402,7 +436,9 @@ fn get_fhsa_summary(
     let conn = state.db.lock().map_err(to_err)?;
     let open_year = db::get_fhsa_open_year(&conn, person_id).map_err(to_err)?;
     let data = db::fhsa_year_data(&conn, person_id, current_year).map_err(to_err)?;
-    let years = open_year.map(|oy| fhsa::compute(&data, oy)).unwrap_or_default();
+    let years = open_year
+        .map(|oy| fhsa::compute(&data, oy))
+        .unwrap_or_default();
 
     let current_room = years.last().map(|y| y.closing_room).unwrap_or(0);
     let current_over_contribution = years.last().map(|y| y.over_contribution).unwrap_or(0);
@@ -412,7 +448,10 @@ fn get_fhsa_summary(
         .unwrap_or(fhsa::LIFETIME_LIMIT);
     let total_contributed = years.iter().map(|y| y.contribution).sum();
     let total_withdrawn = years.iter().map(|y| y.withdrawal).sum();
-    let past_window = years.last().map(|y| y.past_participation_window).unwrap_or(false);
+    let past_window = years
+        .last()
+        .map(|y| y.past_participation_window)
+        .unwrap_or(false);
 
     Ok(FhsaSummary {
         years,
@@ -473,7 +512,11 @@ fn get_backup_settings(state: State<AppState>) -> Result<BackupSettings, String>
 }
 
 #[tauri::command]
-fn set_backup_settings(state: State<AppState>, remote: String, folder: String) -> Result<(), String> {
+fn set_backup_settings(
+    state: State<AppState>,
+    remote: String,
+    folder: String,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(to_err)?;
     BackupConfig::save(&conn, remote.trim(), folder.trim()).map_err(to_err)
 }
@@ -493,7 +536,9 @@ pub fn run() {
             let path = db::default_db_path();
             let conn = db::open(&path).expect("failed to open database");
             db::ensure_default_person(&conn).expect("failed to ensure default person");
-            app.manage(AppState { db: Mutex::new(conn) });
+            app.manage(AppState {
+                db: Mutex::new(conn),
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

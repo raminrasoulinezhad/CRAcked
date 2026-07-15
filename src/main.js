@@ -25,8 +25,9 @@ function fmt(cents) {
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
 }
 
@@ -139,9 +140,10 @@ async function refreshRrsp() {
       .map((y) => {
         let flag = "";
         if (y.dollar_limit_missing) {
-          flag = y.year <= currentYear
-            ? ' <span class="flag err" title="No dollar limit on record for this year — add it below.">needs limit</span>'
-            : ' <span class="flag" title="No published limit yet — estimated from income only.">est.</span>';
+          flag =
+            y.year <= currentYear
+              ? ' <span class="flag err" title="No dollar limit on record for this year — add it below.">needs limit</span>'
+              : ' <span class="flag" title="No published limit yet — estimated from income only.">est.</span>';
         }
         return `<tr>
           <td>${y.year}${flag}</td>
@@ -160,15 +162,15 @@ async function refreshRrsp() {
   if (s.missing_limit_years.length > 0) {
     msgs.push(
       `<strong>Update needed:</strong> no RRSP dollar limit on record for ${s.missing_limit_years.join(", ")}. ` +
-      `Room for ${s.missing_limit_years.length > 1 ? "those years is" : "that year is"} uncapped and may be overstated. ` +
-      `Add the CRA figure under “Annual dollar limits” below.`
+        `Room for ${s.missing_limit_years.length > 1 ? "those years is" : "that year is"} uncapped and may be overstated. ` +
+        `Add the CRA figure under “Annual dollar limits” below.`
     );
   }
   if (s.current_over_contribution > 0) {
     const last = s.years[s.years.length - 1];
     msgs.push(
       `You're over your room by ${fmt(s.current_over_contribution)} beyond the $2,000 buffer. ` +
-      `Estimated penalty: <strong>${fmt(last.estimated_monthly_penalty)}/month</strong>.`
+        `Estimated penalty: <strong>${fmt(last.estimated_monthly_penalty)}/month</strong>.`
     );
   }
   document.querySelector("#rrsp-warnings").innerHTML = msgs
@@ -194,17 +196,19 @@ async function refreshRrsp() {
   // Income list
   const incomes = await invoke("list_annual_income", { personId });
   const incomeEl = document.querySelector("#rrsp-income-list");
-  incomeEl.innerHTML = incomes.length === 0
-    ? '<li class="muted">No income entered yet.</li>'
-    : incomes
-        .map((i) => {
-          const pa = i.pension_adjustment_cents > 0
-            ? ` <span class="muted">(PA ${fmt(i.pension_adjustment_cents)})</span>`
-            : "";
-          const est = i.is_estimate ? ' <span class="flag">estimate</span>' : "";
-          return `<li><span><strong>${i.year}</strong> — ${fmt(i.earned_income_cents)}${pa}${est}</span> ${delBtn("del-income", { year: i.year })}</li>`;
-        })
-        .join("");
+  incomeEl.innerHTML =
+    incomes.length === 0
+      ? '<li class="muted">No income entered yet.</li>'
+      : incomes
+          .map((i) => {
+            const pa =
+              i.pension_adjustment_cents > 0
+                ? ` <span class="muted">(PA ${fmt(i.pension_adjustment_cents)})</span>`
+                : "";
+            const est = i.is_estimate ? ' <span class="flag">estimate</span>' : "";
+            return `<li><span><strong>${i.year}</strong> — ${fmt(i.earned_income_cents)}${pa}${est}</span> ${delBtn("del-income", { year: i.year })}</li>`;
+          })
+          .join("");
 
   // Contribution log
   await renderContribLog("RRSP", "#rrsp-contrib-body");
@@ -217,29 +221,35 @@ async function refreshRrsp() {
 async function renderContribLog(account, selector) {
   const list = await invoke("list_contributions", { personId, account });
   const body = document.querySelector(selector);
-  body.innerHTML = list.length === 0
-    ? '<tr><td colspan="5" class="empty">No contributions logged yet.</td></tr>'
-    : list
-        .map((c) => `<tr>
+  body.innerHTML =
+    list.length === 0
+      ? '<tr><td colspan="5" class="empty">No contributions logged yet.</td></tr>'
+      : list
+          .map(
+            (c) => `<tr>
           <td>${c.tax_year}</td><td>${c.date}</td>
           <td class="num">${fmt(c.amount_cents)}</td><td>${escapeHtml(c.note)}</td>
           <td class="num">${delBtn("del-contrib", { id: c.id, account, label: `${fmt(c.amount_cents)} on ${c.date}` })}</td>
-        </tr>`)
-        .join("");
+        </tr>`
+          )
+          .join("");
 }
 
 async function renderWithdrawLog(account, selector) {
   const list = await invoke("list_withdrawals", { personId, account });
   const body = document.querySelector(selector);
-  body.innerHTML = list.length === 0
-    ? '<tr><td colspan="5" class="empty">No withdrawals logged yet.</td></tr>'
-    : list
-        .map((w) => `<tr>
+  body.innerHTML =
+    list.length === 0
+      ? '<tr><td colspan="5" class="empty">No withdrawals logged yet.</td></tr>'
+      : list
+          .map(
+            (w) => `<tr>
           <td>${w.tax_year}</td><td>${w.date}</td>
           <td class="num">${fmt(w.amount_cents)}</td><td>${escapeHtml(w.note)}</td>
           <td class="num">${delBtn("del-withdrawal", { id: w.id, account, label: `${fmt(w.amount_cents)} on ${w.date}` })}</td>
-        </tr>`)
-        .join("");
+        </tr>`
+          )
+          .join("");
 }
 
 // ---- TFSA -----------------------------------------------------------------
@@ -265,7 +275,8 @@ async function refreshTfsa() {
   }
 
   document.querySelector("#tfsa-year-body").innerHTML = s.years
-    .map((y) => `<tr>
+    .map(
+      (y) => `<tr>
       <td>${y.year}${y.dollar_limit_missing ? ' <span class="flag" title="Limit estimated (beyond shipped data).">est.</span>' : ""}</td>
       <td class="num">${fmt(y.opening_room)}</td>
       <td class="num">${fmt(y.new_room)}</td>
@@ -274,7 +285,8 @@ async function refreshTfsa() {
       <td class="num">${fmt(y.contribution)}</td>
       <td class="num">${y.withdrawal ? fmt(y.withdrawal) : "—"}</td>
       <td class="${closingClass(y.closing_room)}">${fmt(y.closing_room)}</td>
-    </tr>`)
+    </tr>`
+    )
     .join("");
 
   const msgs = [];
@@ -282,7 +294,7 @@ async function refreshTfsa() {
     const last = s.years[s.years.length - 1];
     msgs.push(
       `You're over your TFSA room by ${fmt(s.current_over_contribution)} (there's no buffer). ` +
-      `Estimated penalty: <strong>${fmt(last.estimated_monthly_penalty)}/month</strong>.`
+        `Estimated penalty: <strong>${fmt(last.estimated_monthly_penalty)}/month</strong>.`
     );
   }
   document.querySelector("#tfsa-warnings").innerHTML = msgs
@@ -319,7 +331,8 @@ async function refreshFhsa() {
   }
 
   document.querySelector("#fhsa-year-body").innerHTML = s.years
-    .map((y) => `<tr>
+    .map(
+      (y) => `<tr>
       <td>${y.year}${y.past_participation_window ? ' <span class="flag err" title="Past the ~15-year FHSA window.">past window</span>' : ""}</td>
       <td class="num">${fmt(y.carryforward_in)}</td>
       <td class="num">${fmt(y.new_room)}</td>
@@ -327,7 +340,8 @@ async function refreshFhsa() {
       <td class="num">${fmt(y.contribution)}</td>
       <td class="${closingClass(y.closing_room)}">${fmt(y.closing_room)}</td>
       <td class="num">${fmt(y.lifetime_contributed)}</td>
-    </tr>`)
+    </tr>`
+    )
     .join("");
 
   const msgs = [];
@@ -335,11 +349,13 @@ async function refreshFhsa() {
     const last = s.years[s.years.length - 1];
     msgs.push(
       `You're over your FHSA room by ${fmt(s.current_over_contribution)}. ` +
-      `Estimated penalty: <strong>${fmt(last.estimated_monthly_penalty)}/month</strong>.`
+        `Estimated penalty: <strong>${fmt(last.estimated_monthly_penalty)}/month</strong>.`
     );
   }
   if (s.past_window) {
-    msgs.push(`This FHSA is past its ~15-year participation window — it should be closed or transferred to an RRSP/RRIF.`);
+    msgs.push(
+      `This FHSA is past its ~15-year participation window — it should be closed or transferred to an RRSP/RRIF.`
+    );
   }
   document.querySelector("#fhsa-warnings").innerHTML = msgs
     .map((m) => `<div class="warning">${m}</div>`)
@@ -364,9 +380,9 @@ let activeAccount = "RRSP";
 
 function switchTo(account) {
   activeAccount = account;
-  document.querySelectorAll(".tab").forEach((t) =>
-    t.classList.toggle("active", t.dataset.account === account)
-  );
+  document
+    .querySelectorAll(".tab")
+    .forEach((t) => t.classList.toggle("active", t.dataset.account === account));
   document.querySelectorAll(".account-view").forEach((v) => {
     v.hidden = v.dataset.view !== account;
   });
@@ -391,17 +407,18 @@ async function refreshBackupSettings() {
 
 function onSubmit(id, handler) {
   const form = document.querySelector(id);
-  if (form) form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await handler(e.target);
-  });
+  if (form)
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await handler(e.target);
+    });
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
   // Tabs
-  document.querySelectorAll(".tab").forEach((t) =>
-    t.addEventListener("click", () => switchTo(t.dataset.account))
-  );
+  document
+    .querySelectorAll(".tab")
+    .forEach((t) => t.addEventListener("click", () => switchTo(t.dataset.account)));
 
   // Person selector
   document.querySelector("#person-select").addEventListener("change", (e) => {
@@ -426,7 +443,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   document.querySelector("#person-delete").addEventListener("click", async () => {
     const sel = document.querySelector("#person-select");
     const current = sel.options[sel.selectedIndex]?.text || "this person";
-    if (await confirmDialog(`Delete ${current} and ALL of their RRSP/TFSA/FHSA data? This cannot be undone.`)) {
+    if (
+      await confirmDialog(
+        `Delete ${current} and ALL of their RRSP/TFSA/FHSA data? This cannot be undone.`
+      )
+    ) {
       await invoke("delete_person", { id: personId });
       personId = null;
       await refreshPersons();
@@ -459,7 +480,10 @@ window.addEventListener("DOMContentLoaded", async () => {
     await refreshRrsp();
   });
   onSubmit("#rrsp-opening-form", async (f) => {
-    await invoke("set_rrsp_opening_room", { personId, cents: toCents(f.querySelector("#rrsp-opening-room").value || 0) });
+    await invoke("set_rrsp_opening_room", {
+      personId,
+      cents: toCents(f.querySelector("#rrsp-opening-room").value || 0),
+    });
     await refreshRrsp();
   });
   onSubmit("#rrsp-limit-form", async (f) => {
@@ -509,7 +533,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   // --- FHSA forms ---
   const saveFhsa = async (sel) => {
-    await invoke("set_fhsa_settings", { personId, openYear: Number(document.querySelector(sel).value) });
+    await invoke("set_fhsa_settings", {
+      personId,
+      openYear: Number(document.querySelector(sel).value),
+    });
     await refreshFhsa();
   };
   onSubmit("#fhsa-setup-form", async () => saveFhsa("#fhsa-setup-year"));
@@ -579,7 +606,9 @@ window.addEventListener("DOMContentLoaded", async () => {
       const r = await invoke("backup_now");
       const parts = [r.committed ? "Committed new snapshot." : "No changes to commit."];
       if (r.rclone_attempted) {
-        parts.push(r.rclone_ok ? "Pushed to Google Drive." : `Drive push failed: ${r.rclone_message}`);
+        parts.push(
+          r.rclone_ok ? "Pushed to Google Drive." : `Drive push failed: ${r.rclone_message}`
+        );
       } else {
         parts.push(r.rclone_message);
       }

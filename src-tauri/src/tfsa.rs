@@ -25,6 +25,7 @@ pub const MONTHLY_PENALTY_RATE_PERCENT: i64 = 1;
 
 /// Published TFSA annual dollar limits, in whole dollars. VERIFY against the CRA
 /// and extend as new years are announced.
+/// Verified 2026-07: cumulative 2009-2026 = $109,000 (matches the CRA figure).
 const ANNUAL_DOLLAR_LIMITS: &[(i32, i64)] = &[
     (2009, 5_000),
     (2010, 5_000),
@@ -162,7 +163,12 @@ mod tests {
     }
 
     fn year(y: i32, contribution: Cents, withdrawal: Cents) -> YearData {
-        YearData { year: y, eligible: true, contribution, withdrawal }
+        YearData {
+            year: y,
+            eligible: true,
+            contribution,
+            withdrawal,
+        }
     }
 
     #[test]
@@ -179,7 +185,12 @@ mod tests {
     #[test]
     fn ineligible_years_accrue_nothing() {
         let years = vec![
-            YearData { year: 2020, eligible: false, contribution: 0, withdrawal: 0 },
+            YearData {
+                year: 2020,
+                eligible: false,
+                contribution: 0,
+                withdrawal: 0,
+            },
             year(2021, 0, 0),
         ];
         let r = compute(&years, 0);
@@ -220,10 +231,101 @@ mod tests {
     }
 
     #[test]
+    fn built_in_table_matches_cra_verified_values() {
+        // Verified 2026-07: per-year values and the $109,000 cumulative total.
+        let expected = [
+            (2009, 5_000),
+            (2010, 5_000),
+            (2011, 5_000),
+            (2012, 5_000),
+            (2013, 5_500),
+            (2014, 5_500),
+            (2015, 10_000),
+            (2016, 5_500),
+            (2017, 5_500),
+            (2018, 5_500),
+            (2019, 6_000),
+            (2020, 6_000),
+            (2021, 6_000),
+            (2022, 6_000),
+            (2023, 6_500),
+            (2024, 7_000),
+            (2025, 7_000),
+            (2026, 7_000),
+        ];
+        let mut cumulative = 0;
+        for (year, amount) in expected {
+            assert_eq!(annual_dollar_limit(year), Some(d(amount)), "TFSA {year}");
+            cumulative += amount;
+        }
+        assert_eq!(cumulative, 109_000, "cumulative TFSA room since 2009");
+        assert_eq!(annual_dollar_limit(2008), None); // before the program
+    }
+
+    #[test]
     fn future_year_uses_latest_limit_and_flags_estimate() {
-        let years = vec![YearData { year: 2099, eligible: true, contribution: 0, withdrawal: 0 }];
+        let years = vec![YearData {
+            year: 2099,
+            eligible: true,
+            contribution: 0,
+            withdrawal: 0,
+        }];
         let r = compute(&years, 0);
         assert!(r[0].dollar_limit_missing);
         assert_eq!(r[0].new_room, latest_known_limit());
+    }
+
+    #[test]
+    fn empty_input_produces_no_rows() {
+        assert!(compute(&[], 0).is_empty());
+    }
+
+    #[test]
+    fn contribution_exactly_equal_to_room_leaves_zero() {
+        let r = compute(&[year(2021, d(6_000), 0)], 0);
+        assert_eq!(r[0].closing_room, 0);
+        assert_eq!(r[0].over_contribution, 0);
+        assert_eq!(r[0].estimated_monthly_penalty, 0);
+    }
+
+    #[test]
+    fn multiple_years_of_withdrawals_readd_correctly() {
+        // Each year: contribute the full room, withdraw $1,000. The $1,000 keeps
+        // coming back the next year as extra room.
+        let years = vec![
+            year(2020, d(6_000), d(1_000)),
+            year(2021, d(6_000), d(1_000)),
+            year(2022, d(6_000), d(1_000)),
+        ];
+        let r = compute(&years, 0);
+        assert_eq!(r[0].closing_room, 0);
+        // 2021: $1,000 re-added + $6,000 new = $7,000 available, contribute $6,000 -> $1,000 left.
+        assert_eq!(r[1].withdrawals_readded, d(1_000));
+        assert_eq!(r[1].available_room, d(7_000));
+        assert_eq!(r[1].closing_room, d(1_000));
+        // 2022: opening $1,000 + $1,000 re-added + $6,000 = $8,000, contribute $6,000 -> $2,000.
+        assert_eq!(r[2].available_room, d(8_000));
+        assert_eq!(r[2].closing_room, d(2_000));
+    }
+
+    #[test]
+    fn opening_room_carried_in_is_respected() {
+        // Someone who tracked elsewhere and carries $30,000 of room into 2024.
+        let r = compute(&[year(2024, d(10_000), 0)], d(30_000));
+        assert_eq!(r[0].opening_room, d(30_000));
+        assert_eq!(r[0].available_room, d(37_000)); // 30,000 + 7,000 (2024)
+        assert_eq!(r[0].closing_room, d(27_000));
+    }
+
+    #[test]
+    fn over_contribution_recovers_via_new_room_next_year() {
+        let years = vec![year(2021, d(9_000), 0), year(2022, 0, 0)];
+        let r = compute(&years, 0);
+        assert_eq!(r[0].closing_room, d(-3_000));
+        assert_eq!(r[0].over_contribution, d(3_000)); // 9,000 - 6,000, no buffer
+                                                      // 2022: -3,000 carried + 6,000 new room = 3,000, no longer over.
+        assert_eq!(r[1].available_room, d(3_000));
+        assert_eq!(r[1].closing_room, d(3_000));
+        assert_eq!(r[1].over_contribution, 0);
     }
 }

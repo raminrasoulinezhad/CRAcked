@@ -19,7 +19,7 @@ confusing: they build up over years, carry forward, and change annually. CRAcked
 does that math for you and shows you one clear number: **how much room you have
 left.**
 
-> 🇨🇦 Your money stays on your computer. Nothing is sent anywhere unless *you*
+> 🇨🇦 Your money stays on your computer. Nothing is sent anywhere unless _you_
 > turn on Google Drive backup.
 
 ---
@@ -51,13 +51,13 @@ left.**
 Download the installer for your system and run it — that's the whole setup.
 Everything the app needs is included in the one file.
 
-| Your computer | Download this | Then |
-| --- | --- | --- |
-| **Windows** | `CRAcked_..._x64-setup.exe` | Double-click and follow the prompts. |
-| **Mac (Apple Silicon)** | `CRAcked_..._aarch64.dmg` | Open it, drag CRAcked into Applications. |
-| **Mac (Intel)** | `CRAcked_..._x64.dmg` | Open it, drag CRAcked into Applications. |
-| **Linux** | `CRAcked_..._amd64.AppImage` | Make it executable, then double-click. |
-| **Linux (Ubuntu/Debian)** | `CRAcked_..._amd64.deb` | Install with your software centre, or `sudo apt install ./CRAcked_*.deb`. |
+| Your computer             | Download this                | Then                                                                      |
+| ------------------------- | ---------------------------- | ------------------------------------------------------------------------- |
+| **Windows**               | `CRAcked_..._x64-setup.exe`  | Double-click and follow the prompts.                                      |
+| **Mac (Apple Silicon)**   | `CRAcked_..._aarch64.dmg`    | Open it, drag CRAcked into Applications.                                  |
+| **Mac (Intel)**           | `CRAcked_..._x64.dmg`        | Open it, drag CRAcked into Applications.                                  |
+| **Linux**                 | `CRAcked_..._amd64.AppImage` | Make it executable, then double-click.                                    |
+| **Linux (Ubuntu/Debian)** | `CRAcked_..._amd64.deb`      | Install with your software centre, or `sudo apt install ./CRAcked_*.deb`. |
 
 Once installed, find **CRAcked** in your Start menu (Windows), Launchpad (Mac),
 or app grid (Linux) — press the **Windows key / Command** and type "CRAcked".
@@ -78,11 +78,13 @@ For RRSP, CRAcked builds your contribution room from two things: **your income**
 (which earns you room) and **your contributions** (which use it up). Here's the flow:
 
 ### 1. (Optional) Enter your starting room
+
 If you've had an RRSP before using this app, open the **Starting room** section
 and enter the unused room from your latest **CRA Notice of Assessment**. Starting
 fresh? Leave it at $0.
 
 ### 2. Add your earned income, year by year
+
 In **Annual earned income**, enter what you earned each year.
 
 > 💡 Income earned in one year gives you room the **following** year. RRSP room =
@@ -90,10 +92,12 @@ In **Annual earned income**, enter what you earned each year.
 > timing for you — just enter each year's income.
 
 ### 3. Log your contributions
+
 In **Add a contribution**, enter the tax year, date, and amount each time you put
 money in. They show up in the **Contribution log**, where you can delete mistakes.
 
 ### 4. Read your dashboard
+
 - **Contribution room left** — the big number: what you can still contribute.
 - **Year-by-year room** — how room built up and got used each year.
 - **Warnings** — if you've gone over your limit, CRAcked tells you by how much
@@ -116,7 +120,7 @@ minutes to set up once.
 **Quick version:**
 
 1. Open a terminal and run `rclone config` once, then log into your Google
-   account (it opens your browser — just click *Allow*). Name the connection
+   account (it opens your browser — just click _Allow_). Name the connection
    **`gdrive`**.
    <br><sub>CRAcked bundles rclone for its own backups. If your terminal says
    `rclone` isn't found, grab the free 2-minute download from
@@ -131,6 +135,7 @@ automatically.
 [BACKUP.md](BACKUP.md).**
 
 ### Getting your data back
+
 Lost your computer or starting on a new one? Install CRAcked, set up the same
 `gdrive` connection, and copy the backup down — your data and its full history
 come right back. See [BACKUP.md](BACKUP.md#restore-new-machine-or-recovering-after-a-wipe).

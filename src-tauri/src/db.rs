@@ -51,7 +51,9 @@ pub fn open_in_memory() -> Result<Connection> {
 // Schema & migration
 // ---------------------------------------------------------------------------
 
-const SCHEMA: &str = r#"
+// Table creation only — indexes are applied *after* migration so they can
+// reference columns (like person_id) that older databases gain during upgrade.
+const SCHEMA_TABLES: &str = r#"
     CREATE TABLE IF NOT EXISTS person (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         name       TEXT    NOT NULL,
@@ -90,8 +92,6 @@ const SCHEMA: &str = r#"
         amount_cents INTEGER NOT NULL,
         note         TEXT    NOT NULL DEFAULT ''
     );
-    CREATE INDEX IF NOT EXISTS idx_contribution_person_account_year
-        ON contribution(person_id, account, tax_year);
 
     CREATE TABLE IF NOT EXISTS withdrawal (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,14 +102,20 @@ const SCHEMA: &str = r#"
         amount_cents INTEGER NOT NULL,
         note         TEXT    NOT NULL DEFAULT ''
     );
-    CREATE INDEX IF NOT EXISTS idx_withdrawal_person_account_year
-        ON withdrawal(person_id, account, tax_year);
 
     -- Global: CRA RRSP annual dollar limits (shared by everyone).
     CREATE TABLE IF NOT EXISTS rrsp_dollar_limit (
         year         INTEGER PRIMARY KEY,
         amount_cents INTEGER NOT NULL
     );
+"#;
+
+// Indexes applied after tables exist and migrations have added their columns.
+const SCHEMA_INDEXES: &str = r#"
+    CREATE INDEX IF NOT EXISTS idx_contribution_person_account_year
+        ON contribution(person_id, account, tax_year);
+    CREATE INDEX IF NOT EXISTS idx_withdrawal_person_account_year
+        ON withdrawal(person_id, account, tax_year);
 "#;
 
 fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
@@ -136,10 +142,12 @@ fn table_exists(conn: &Connection, table: &str) -> Result<bool> {
 fn migrate(conn: &Connection) -> Result<()> {
     // Migrate a pre-multi-person (v1) database created before this schema.
     // Detect it: contribution exists but has no person_id column.
-    let needs_v2 = table_exists(conn, "contribution")?
-        && !column_exists(conn, "contribution", "person_id")?;
+    let needs_v2 =
+        table_exists(conn, "contribution")? && !column_exists(conn, "contribution", "person_id")?;
 
-    conn.execute_batch(SCHEMA)?;
+    // Create tables first (skips ones an older DB already has, keeping their old
+    // shape so the migration steps below can upgrade them).
+    conn.execute_batch(SCHEMA_TABLES)?;
 
     if needs_v2 {
         migrate_v1_to_v2(conn)?;
@@ -150,6 +158,8 @@ fn migrate(conn: &Connection) -> Result<()> {
             "ALTER TABLE annual_income ADD COLUMN is_estimate INTEGER NOT NULL DEFAULT 0;",
         )?;
     }
+    // Indexes last: person_id now exists on every table they reference.
+    conn.execute_batch(SCHEMA_INDEXES)?;
     ensure_default_person(conn)?;
     Ok(())
 }
@@ -220,25 +230,32 @@ pub struct Person {
 pub fn ensure_default_person(conn: &Connection) -> Result<i64> {
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM person", [], |r| r.get(0))?;
     if count == 0 {
-        conn.execute(
-            "INSERT INTO person(name, sort_order) VALUES('Me', 0)",
-            [],
-        )?;
+        conn.execute("INSERT INTO person(name, sort_order) VALUES('Me', 0)", [])?;
     }
-    conn.query_row("SELECT id FROM person ORDER BY sort_order, id LIMIT 1", [], |r| r.get(0))
+    conn.query_row(
+        "SELECT id FROM person ORDER BY sort_order, id LIMIT 1",
+        [],
+        |r| r.get(0),
+    )
 }
 
 pub fn list_persons(conn: &Connection) -> Result<Vec<Person>> {
     let mut stmt = conn.prepare("SELECT id, name FROM person ORDER BY sort_order, id")?;
     let rows = stmt.query_map([], |row| {
-        Ok(Person { id: row.get(0)?, name: row.get(1)? })
+        Ok(Person {
+            id: row.get(0)?,
+            name: row.get(1)?,
+        })
     })?;
     rows.collect()
 }
 
 pub fn add_person(conn: &Connection, name: &str) -> Result<i64> {
-    let next_order: i64 = conn
-        .query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM person", [], |r| r.get(0))?;
+    let next_order: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM person",
+        [],
+        |r| r.get(0),
+    )?;
     conn.execute(
         "INSERT INTO person(name, sort_order) VALUES(?1, ?2)",
         params![name, next_order],
@@ -247,7 +264,10 @@ pub fn add_person(conn: &Connection, name: &str) -> Result<i64> {
 }
 
 pub fn rename_person(conn: &Connection, id: i64, name: &str) -> Result<()> {
-    conn.execute("UPDATE person SET name = ?1 WHERE id = ?2", params![name, id])?;
+    conn.execute(
+        "UPDATE person SET name = ?1 WHERE id = ?2",
+        params![name, id],
+    )?;
     Ok(())
 }
 
@@ -255,8 +275,14 @@ pub fn rename_person(conn: &Connection, id: i64, name: &str) -> Result<()> {
 pub fn delete_person(conn: &Connection, id: i64) -> Result<()> {
     conn.execute("DELETE FROM contribution WHERE person_id = ?1", params![id])?;
     conn.execute("DELETE FROM withdrawal WHERE person_id = ?1", params![id])?;
-    conn.execute("DELETE FROM annual_income WHERE person_id = ?1", params![id])?;
-    conn.execute("DELETE FROM person_setting WHERE person_id = ?1", params![id])?;
+    conn.execute(
+        "DELETE FROM annual_income WHERE person_id = ?1",
+        params![id],
+    )?;
+    conn.execute(
+        "DELETE FROM person_setting WHERE person_id = ?1",
+        params![id],
+    )?;
     conn.execute("DELETE FROM person WHERE id = ?1", params![id])?;
     Ok(())
 }
@@ -266,9 +292,11 @@ pub fn delete_person(conn: &Connection, id: i64) -> Result<()> {
 // ---------------------------------------------------------------------------
 
 pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", params![key], |row| {
-        row.get::<_, String>(0)
-    })
+    conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        params![key],
+        |row| row.get::<_, String>(0),
+    )
     .map(Some)
     .or_else(|e| match e {
         rusqlite::Error::QueryReturnedNoRows => Ok(None),
@@ -338,8 +366,18 @@ pub fn set_tfsa_settings(
     start_year: i32,
     opening_room: Cents,
 ) -> Result<()> {
-    set_person_setting(conn, person_id, KEY_TFSA_START_YEAR, &start_year.to_string())?;
-    set_person_setting(conn, person_id, KEY_TFSA_OPENING_ROOM, &opening_room.to_string())
+    set_person_setting(
+        conn,
+        person_id,
+        KEY_TFSA_START_YEAR,
+        &start_year.to_string(),
+    )?;
+    set_person_setting(
+        conn,
+        person_id,
+        KEY_TFSA_OPENING_ROOM,
+        &opening_room.to_string(),
+    )
 }
 
 pub fn get_fhsa_open_year(conn: &Connection, person_id: i64) -> Result<Option<i32>> {
@@ -364,7 +402,9 @@ pub fn upsert_rrsp_dollar_limit(conn: &Connection, year: i32, amount_cents: Cent
 pub fn list_rrsp_dollar_limit_overrides(conn: &Connection) -> Result<BTreeMap<i32, Cents>> {
     let mut stmt =
         conn.prepare("SELECT year, amount_cents FROM rrsp_dollar_limit ORDER BY year")?;
-    let rows = stmt.query_map([], |row| Ok((row.get::<_, i32>(0)?, row.get::<_, Cents>(1)?)))?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, i32>(0)?, row.get::<_, Cents>(1)?))
+    })?;
     let mut map = BTreeMap::new();
     for r in rows {
         let (y, c) = r?;
@@ -376,7 +416,10 @@ pub fn list_rrsp_dollar_limit_overrides(conn: &Connection) -> Result<BTreeMap<i3
 /// Resolve the effective RRSP dollar limit for a year: user override wins, then
 /// the built-in table, else `None`.
 pub fn resolve_rrsp_limit(overrides: &BTreeMap<i32, Cents>, year: i32) -> Option<Cents> {
-    overrides.get(&year).copied().or_else(|| rrsp::annual_dollar_limit(year))
+    overrides
+        .get(&year)
+        .copied()
+        .or_else(|| rrsp::annual_dollar_limit(year))
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +436,11 @@ pub struct AnnualIncome {
     pub is_estimate: bool,
 }
 
-pub fn upsert_annual_income(conn: &Connection, person_id: i64, income: &AnnualIncome) -> Result<()> {
+pub fn upsert_annual_income(
+    conn: &Connection,
+    person_id: i64,
+    income: &AnnualIncome,
+) -> Result<()> {
     conn.execute(
         "INSERT INTO annual_income(person_id, year, earned_income_cents, pension_adjustment_cents, is_estimate)
          VALUES(?1, ?2, ?3, ?4, ?5)
@@ -413,7 +460,11 @@ pub fn upsert_annual_income(conn: &Connection, person_id: i64, income: &AnnualIn
 }
 
 /// Look up one person's income record for a specific year.
-pub fn get_annual_income(conn: &Connection, person_id: i64, year: i32) -> Result<Option<AnnualIncome>> {
+pub fn get_annual_income(
+    conn: &Connection,
+    person_id: i64,
+    year: i32,
+) -> Result<Option<AnnualIncome>> {
     conn.query_row(
         "SELECT year, earned_income_cents, pension_adjustment_cents, is_estimate
          FROM annual_income WHERE person_id = ?1 AND year = ?2",
@@ -576,7 +627,11 @@ pub fn delete_withdrawal(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-pub fn list_withdrawals(conn: &Connection, person_id: i64, account: &str) -> Result<Vec<Withdrawal>> {
+pub fn list_withdrawals(
+    conn: &Connection,
+    person_id: i64,
+    account: &str,
+) -> Result<Vec<Withdrawal>> {
     let mut stmt = conn.prepare(
         "SELECT id, person_id, account, tax_year, date, amount_cents, note
          FROM withdrawal WHERE person_id = ?1 AND account = ?2
@@ -628,8 +683,12 @@ pub fn rrsp_year_data(conn: &Connection, person_id: i64) -> Result<Vec<rrsp::Yea
     let income_by_year: BTreeMap<i32, &AnnualIncome> =
         incomes.iter().map(|i| (i.year, i)).collect();
 
-    let candidates = income_by_year.keys().map(|y| y + 1).chain(contribs.keys().copied());
-    let (min_y, max_y) = candidates.fold((i32::MAX, i32::MIN), |(lo, hi), y| (lo.min(y), hi.max(y)));
+    let candidates = income_by_year
+        .keys()
+        .map(|y| y + 1)
+        .chain(contribs.keys().copied());
+    let (min_y, max_y) =
+        candidates.fold((i32::MAX, i32::MIN), |(lo, hi), y| (lo.min(y), hi.max(y)));
     if min_y == i32::MAX {
         return Ok(Vec::new());
     }
@@ -660,7 +719,12 @@ pub fn tfsa_year_data(
     let contribs = contributions_by_year(conn, person_id, "TFSA")?;
     let withdrawals = withdrawals_by_year(conn, person_id, "TFSA")?;
 
-    let max_txn = contribs.keys().chain(withdrawals.keys()).copied().max().unwrap_or(start);
+    let max_txn = contribs
+        .keys()
+        .chain(withdrawals.keys())
+        .copied()
+        .max()
+        .unwrap_or(start);
     let end = current_year.max(max_txn).max(start);
 
     let mut out = Vec::new();
@@ -687,7 +751,12 @@ pub fn fhsa_year_data(
     let contribs = contributions_by_year(conn, person_id, "FHSA")?;
     let withdrawals = withdrawals_by_year(conn, person_id, "FHSA")?;
 
-    let max_txn = contribs.keys().chain(withdrawals.keys()).copied().max().unwrap_or(open_year);
+    let max_txn = contribs
+        .keys()
+        .chain(withdrawals.keys())
+        .copied()
+        .max()
+        .unwrap_or(open_year);
     let end = current_year.max(max_txn).max(open_year);
 
     let mut out = Vec::new();
@@ -725,9 +794,8 @@ pub fn export_json(conn: &Connection) -> Result<serde_json::Value> {
     // person_setting rows, ordered.
     let mut person_settings: Vec<serde_json::Value> = Vec::new();
     {
-        let mut stmt = conn.prepare(
-            "SELECT person_id, key, value FROM person_setting ORDER BY person_id, key",
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT person_id, key, value FROM person_setting ORDER BY person_id, key")?;
         let rows = stmt.query_map([], |row| {
             Ok(serde_json::json!({
                 "person_id": row.get::<_, i64>(0)?,
@@ -845,14 +913,19 @@ mod tests {
         add_contribution(&conn, me, "RRSP", 2024, "2024-01-01", 1_000_00, "").unwrap();
         add_contribution(&conn, spouse, "RRSP", 2024, "2024-01-01", 5_000_00, "").unwrap();
         assert_eq!(list_contributions(&conn, me, "RRSP").unwrap().len(), 1);
-        assert_eq!(list_contributions(&conn, spouse, "RRSP").unwrap()[0].amount_cents, 5_000_00);
+        assert_eq!(
+            list_contributions(&conn, spouse, "RRSP").unwrap()[0].amount_cents,
+            5_000_00
+        );
 
         rename_person(&conn, spouse, "Alexandra").unwrap();
         assert_eq!(list_persons(&conn).unwrap()[1].name, "Alexandra");
 
         delete_person(&conn, spouse).unwrap();
         assert_eq!(list_persons(&conn).unwrap().len(), 1);
-        assert!(list_contributions(&conn, spouse, "RRSP").unwrap().is_empty());
+        assert!(list_contributions(&conn, spouse, "RRSP")
+            .unwrap()
+            .is_empty());
         // The other person's data is untouched.
         assert_eq!(list_contributions(&conn, me, "RRSP").unwrap().len(), 1);
     }
@@ -873,7 +946,17 @@ mod tests {
     fn annual_income_upsert_and_delete() {
         let conn = open_in_memory().unwrap();
         let me = p(&conn);
-        upsert_annual_income(&conn, me, &AnnualIncome { year: 2023, earned_income_cents: 55_000_00, pension_adjustment_cents: 0, is_estimate: false }).unwrap();
+        upsert_annual_income(
+            &conn,
+            me,
+            &AnnualIncome {
+                year: 2023,
+                earned_income_cents: 55_000_00,
+                pension_adjustment_cents: 0,
+                is_estimate: false,
+            },
+        )
+        .unwrap();
         assert_eq!(list_annual_income(&conn, me).unwrap().len(), 1);
         delete_annual_income(&conn, me, 2023).unwrap();
         assert!(list_annual_income(&conn, me).unwrap().is_empty());
@@ -896,16 +979,38 @@ mod tests {
         let me = p(&conn);
         let id1 = add_withdrawal(&conn, me, "TFSA", 2024, "2024-05-01", 3_000_00, "").unwrap();
         add_withdrawal(&conn, me, "TFSA", 2024, "2024-08-01", 1_000_00, "car").unwrap();
-        assert_eq!(withdrawals_by_year(&conn, me, "TFSA").unwrap().get(&2024).copied(), Some(4_000_00));
+        assert_eq!(
+            withdrawals_by_year(&conn, me, "TFSA")
+                .unwrap()
+                .get(&2024)
+                .copied(),
+            Some(4_000_00)
+        );
         delete_withdrawal(&conn, id1).unwrap();
-        assert_eq!(withdrawals_by_year(&conn, me, "TFSA").unwrap().get(&2024).copied(), Some(1_000_00));
+        assert_eq!(
+            withdrawals_by_year(&conn, me, "TFSA")
+                .unwrap()
+                .get(&2024)
+                .copied(),
+            Some(1_000_00)
+        );
     }
 
     #[test]
     fn rrsp_year_data_maps_prior_year_income_and_limit() {
         let conn = open_in_memory().unwrap();
         let me = p(&conn);
-        upsert_annual_income(&conn, me, &AnnualIncome { year: 2023, earned_income_cents: 50_000_00, pension_adjustment_cents: 0, is_estimate: false }).unwrap();
+        upsert_annual_income(
+            &conn,
+            me,
+            &AnnualIncome {
+                year: 2023,
+                earned_income_cents: 50_000_00,
+                pension_adjustment_cents: 0,
+                is_estimate: false,
+            },
+        )
+        .unwrap();
         add_contribution(&conn, me, "RRSP", 2024, "2024-02-01", 3_000_00, "").unwrap();
         let data = rrsp_year_data(&conn, me).unwrap();
         assert_eq!(data.len(), 1);
@@ -929,5 +1034,68 @@ mod tests {
         let f = fhsa_year_data(&conn, me, 2026).unwrap();
         assert_eq!(f.first().unwrap().year, 2023);
         assert!(f.iter().all(|d| d.open));
+    }
+
+    #[test]
+    fn migrates_a_v1_single_person_database() {
+        // Recreate the old (pre multi-person) schema and some data, then migrate.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE annual_income(
+                year INTEGER PRIMARY KEY,
+                earned_income_cents INTEGER NOT NULL DEFAULT 0,
+                pension_adjustment_cents INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE contribution(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, account TEXT NOT NULL,
+                tax_year INTEGER NOT NULL, date TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '');
+            CREATE TABLE withdrawal(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, account TEXT NOT NULL,
+                tax_year INTEGER NOT NULL, date TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '');
+            INSERT INTO contribution(account, tax_year, date, amount_cents, note)
+                VALUES('RRSP', 2024, '2024-01-01', 1000, '');
+            INSERT INTO annual_income(year, earned_income_cents, pension_adjustment_cents)
+                VALUES(2023, 5000000, 0);
+            INSERT INTO settings(key, value) VALUES('tfsa_start_year', '2015');
+            "#,
+        )
+        .unwrap();
+
+        migrate(&conn).unwrap();
+
+        let me = 1; // existing data is attributed to the first person
+        assert!(column_exists(&conn, "contribution", "person_id").unwrap());
+        assert!(column_exists(&conn, "annual_income", "person_id").unwrap());
+        assert_eq!(list_contributions(&conn, me, "RRSP").unwrap().len(), 1);
+        assert_eq!(list_annual_income(&conn, me).unwrap().len(), 1);
+        // Per-person setting was moved out of the global settings table.
+        assert_eq!(get_tfsa_start_year(&conn, me).unwrap(), Some(2015));
+        assert_eq!(get_setting(&conn, "tfsa_start_year").unwrap(), None);
+    }
+
+    #[test]
+    fn export_json_has_expected_top_level_shape() {
+        let conn = open_in_memory().unwrap();
+        let me = p(&conn);
+        add_contribution(&conn, me, "RRSP", 2024, "2024-01-01", 1_000_00, "").unwrap();
+        add_withdrawal(&conn, me, "TFSA", 2024, "2024-06-01", 500_00, "").unwrap();
+        let v = export_json(&conn).unwrap();
+        for key in [
+            "schema_version",
+            "persons",
+            "settings",
+            "person_settings",
+            "annual_income",
+            "contributions",
+            "withdrawals",
+            "rrsp_dollar_limit_overrides",
+        ] {
+            assert!(v.get(key).is_some(), "export missing key: {key}");
+        }
+        assert_eq!(v["contributions"].as_array().unwrap().len(), 1);
+        assert_eq!(v["withdrawals"].as_array().unwrap().len(), 1);
     }
 }

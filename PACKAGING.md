@@ -16,12 +16,12 @@ So whoever you share an installer with just runs it; there is nothing else to se
 
 ## For your friend (just installing)
 
-| OS | File to download | How to install |
-| --- | --- | --- |
-| **Windows** | `CRAcked_x.y.z_x64-setup.exe` (or `.msi`) | Double-click, click through. |
-| **macOS** | `CRAcked_x.y.z_aarch64.dmg` (Apple Silicon) or `_x64.dmg` (Intel) | Open, drag CRAcked to Applications. |
-| **Linux** | `cracked_x.y.z_amd64.AppImage` | `chmod +x` it, then double-click / run. Portable, no install. |
-| **Linux (Debian/Ubuntu)** | `cracked_x.y.z_amd64.deb` | `sudo apt install ./cracked_*.deb` |
+| OS                        | File to download                                                  | How to install                                                |
+| ------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Windows**               | `CRAcked_x.y.z_x64-setup.exe` (or `.msi`)                         | Double-click, click through.                                  |
+| **macOS**                 | `CRAcked_x.y.z_aarch64.dmg` (Apple Silicon) or `_x64.dmg` (Intel) | Open, drag CRAcked to Applications.                           |
+| **Linux**                 | `cracked_x.y.z_amd64.AppImage`                                    | `chmod +x` it, then double-click / run. Portable, no install. |
+| **Linux (Debian/Ubuntu)** | `cracked_x.y.z_amd64.deb`                                         | `sudo apt install ./cracked_*.deb`                            |
 
 After installing, the app appears in the Start menu / Launchpad / app grid. For
 Google Drive backup, follow the one-time login in [`BACKUP.md`](BACKUP.md).
@@ -68,7 +68,7 @@ cargo tauri build --bundles dmg            # macOS
 
 Output lands in `src-tauri/target/release/bundle/`.
 
-> You can only build a given OS's installer *on* that OS. That's why the CI
+> You can only build a given OS's installer _on_ that OS. That's why the CI
 > pipeline exists — it runs the Windows build on Windows, the Mac build on Mac,
 > etc.
 

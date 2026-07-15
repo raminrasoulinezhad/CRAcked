@@ -29,4 +29,3 @@ dirs = "5"
 # default-features off drops the network/https/ssh transports we don't use
 # (backups reach Drive via rclone, not git push), keeping the C dep surface small.
 git2 = { version = "0.19", default-features = false, features = ["vendored-libgit2"] }
-

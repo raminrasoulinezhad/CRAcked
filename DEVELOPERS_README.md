@@ -41,11 +41,11 @@ annoying. CRAcked exists to make that dead simple, so you never:
 
 ## The accounts, at a glance
 
-| Account | Tax treatment | Room grows by | Key caps |
-| --- | --- | --- | --- |
-| **RRSP** | Tax-**deferred** (deduct now, taxed on withdrawal) | 18% of prior-year earned income + unused room | Annual dollar max; over-contribution buffer |
-| **TFSA** | Tax-**free** (no deduction, tax-free growth & withdrawal) | Annual limit + unused room + withdrawals re-added next year | Cumulative lifetime room since eligibility |
-| **FHSA** | Tax-**free for a first home** (deduct now, tax-free qualifying withdrawal) | Annual limit + limited carry-forward | Annual cap; lifetime cap; 15-year window |
+| Account  | Tax treatment                                                              | Room grows by                                               | Key caps                                    |
+| -------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------- |
+| **RRSP** | Tax-**deferred** (deduct now, taxed on withdrawal)                         | 18% of prior-year earned income + unused room               | Annual dollar max; over-contribution buffer |
+| **TFSA** | Tax-**free** (no deduction, tax-free growth & withdrawal)                  | Annual limit + unused room + withdrawals re-added next year | Cumulative lifetime room since eligibility  |
+| **FHSA** | Tax-**free for a first home** (deduct now, tax-free qualifying withdrawal) | Annual limit + limited carry-forward                        | Annual cap; lifetime cap; 15-year window    |
 
 > Exact numbers change year to year and depend on your personal history —
 > CRAcked is designed to model these rules explicitly rather than hard-code a
@@ -53,12 +53,12 @@ annoying. CRAcked exists to make that dead simple, so you never:
 
 ## Features
 
-- [x] Track RRSP contributions per year
-- [x] Compute RRSP room (18% accrual, annual dollar-limit cap, unused-room carry-forward)
-- [x] Over-contribution warnings ($2,000 buffer + 1%/month penalty estimate)
-- [x] Local git version history of all data + append-only Google Drive backup
-- [ ] TFSA rules (cumulative room + withdrawal re-contribution timing)
-- [ ] FHSA rules (annual cap, carry-forward, lifetime cap, 15-year window)
+- [x] RRSP room (18% accrual, annual dollar-limit cap, unused-room carry-forward, $2,000 buffer)
+- [x] TFSA room (cumulative annual room, withdrawal re-added next year, no buffer)
+- [x] FHSA room ($8k/year, $40k lifetime, capped carry-forward, 15-year window)
+- [x] Per-family-member tracking; deletable records with confirmation
+- [x] Current-year estimated-income pro-rated accrual projection (RRSP)
+- [x] Local git version history + append-only Google Drive backup
 - [ ] Estimate tax refund / deferral from RRSP & FHSA deductions
 - [ ] Multi-year projections
 
@@ -108,11 +108,37 @@ cd src-tauri && cargo tauri build   # build an installer for this OS
 Your data lives in `~/.local/share/CRAcked/`. To back it up to Google Drive,
 follow the one-time setup in [`BACKUP.md`](BACKUP.md).
 
+## Code quality gates
+
+All enforced identically by **pre-commit** (locally) and **GitHub Actions**
+(`.github/workflows/ci.yml`) — nothing merges that fails these:
+
+| Check         | Command                                          |
+| ------------- | ------------------------------------------------ |
+| Rust format   | `cargo fmt --check` (config: `rustfmt.toml`)     |
+| Rust lint     | `cargo clippy --all-targets -- -D warnings`      |
+| Rust tests    | `cargo test` (runs on push / in CI)              |
+| Frontend/docs | `npx prettier --check .` (config: `.prettierrc`) |
+| File hygiene  | trailing whitespace, EOF, YAML/JSON/TOML, etc.   |
+
+One-time setup for contributors:
+
+```bash
+pip install pre-commit
+pre-commit install                      # fmt / clippy / prettier / hygiene on commit
+pre-commit install --hook-type pre-push # full test suite on push
+```
+
+Money is stored in integer **cents** everywhere, written with a deliberate
+`8_000_00` (= $8,000.00) digit grouping. Rule engines (`rrsp`/`tfsa`/`fhsa`)
+are pure and fully unit-tested; the CRA limit tables are guarded by tests that
+assert the exact published figures.
+
 ## Status
 
-🚧 Active development. **RRSP is fully implemented** (tracking, room calculation,
-over-contribution warnings) with local + Google Drive backup working. TFSA and
-FHSA are next.
+🚧 Active development. **All three accounts (RRSP, TFSA, FHSA) are implemented**
+with per-family-member tracking, room calculation, over-contribution warnings,
+and local + Google Drive backup. 53 Rust tests; CI + pre-commit enforced.
 
 ## Disclaimer
 

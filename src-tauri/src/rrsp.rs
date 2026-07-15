@@ -46,6 +46,7 @@ pub const MONTHLY_PENALTY_RATE_PERCENT: i64 = 1;
 ///
 /// These are CRA-published figures and **must be correct** — verify before
 /// adding a new year. Source: CRA "MP, DB, RRSP, DPSP, ALDA, TFSA limits".
+/// Verified 2026-07 against taxtips.ca (mirrors the CRA table).
 const ANNUAL_DOLLAR_LIMITS: &[(i32, i64)] = &[
     (2010, 22_000),
     (2011, 22_450),
@@ -139,7 +140,11 @@ fn eighteen_percent(income: Cents) -> Cents {
 /// given dollar limit. Returns `(room, limit_known)`. Used for the current-year
 /// projection where the income is an estimate. `dollar_limit` is the limit for
 /// the year the room applies to.
-pub fn new_room(prior_year_income: Cents, dollar_limit: Option<Cents>, pension_adjustment: Cents) -> (Cents, bool) {
+pub fn new_room(
+    prior_year_income: Cents,
+    dollar_limit: Option<Cents>,
+    pension_adjustment: Cents,
+) -> (Cents, bool) {
     new_room_for_year(&YearData {
         year: 0,
         prior_year_earned_income: prior_year_income,
@@ -227,12 +232,37 @@ mod tests {
     }
 
     #[test]
-    fn built_in_table_covers_2010_onward_with_known_values() {
-        assert_eq!(annual_dollar_limit(2010), Some(dollars(22_000)));
-        assert_eq!(annual_dollar_limit(2015), Some(dollars(24_930)));
-        assert_eq!(annual_dollar_limit(2024), Some(dollars(31_560)));
-        assert_eq!(annual_dollar_limit(2026), Some(dollars(33_810)));
+    fn built_in_table_matches_cra_verified_values() {
+        // Full table, verified 2026-07 against the CRA / taxtips.ca figures.
+        // A guard against accidental edits — every value must stay correct.
+        let expected = [
+            (2010, 22_000),
+            (2011, 22_450),
+            (2012, 22_970),
+            (2013, 23_820),
+            (2014, 24_270),
+            (2015, 24_930),
+            (2016, 25_370),
+            (2017, 26_010),
+            (2018, 26_230),
+            (2019, 26_500),
+            (2020, 27_230),
+            (2021, 27_830),
+            (2022, 29_210),
+            (2023, 30_780),
+            (2024, 31_560),
+            (2025, 32_490),
+            (2026, 33_810),
+        ];
+        for (year, amount) in expected {
+            assert_eq!(
+                annual_dollar_limit(year),
+                Some(dollars(amount)),
+                "RRSP {year}"
+            );
+        }
         assert_eq!(annual_dollar_limit(2009), None); // before the table
+        assert_eq!(latest_known_limit_year(), 2026);
     }
 
     #[test]
@@ -254,8 +284,10 @@ mod tests {
 
     #[test]
     fn unused_room_carries_forward() {
-        let years = vec![yd(2023, dollars(50_000), 0, dollars(4_000)),
-                         yd(2024, dollars(50_000), 0, dollars(2_000))];
+        let years = vec![
+            yd(2023, dollars(50_000), 0, dollars(4_000)),
+            yd(2024, dollars(50_000), 0, dollars(2_000)),
+        ];
         let r = compute(&years, 0);
         assert_eq!(r[0].available_room, dollars(9_000));
         assert_eq!(r[0].closing_room, dollars(5_000));
@@ -325,9 +357,68 @@ mod tests {
 
     #[test]
     fn out_of_order_years_are_sorted() {
-        let years = vec![yd(2024, dollars(50_000), 0, 0), yd(2023, dollars(50_000), 0, 0)];
+        let years = vec![
+            yd(2024, dollars(50_000), 0, 0),
+            yd(2023, dollars(50_000), 0, 0),
+        ];
         let r = compute(&years, 0);
         assert_eq!(r[0].year, 2023);
         assert_eq!(r[1].year, 2024);
+    }
+
+    #[test]
+    fn empty_input_produces_no_rows() {
+        assert!(compute(&[], 0).is_empty());
+        assert!(compute(&[], dollars(5_000)).is_empty());
+    }
+
+    #[test]
+    fn zero_income_grants_no_new_room() {
+        let r = compute(&[yd(2024, 0, 0, 0)], 0);
+        assert_eq!(r[0].new_room, 0);
+        assert_eq!(r[0].available_room, 0);
+    }
+
+    #[test]
+    fn pension_adjustment_exceeding_18pct_floors_at_zero() {
+        // 18% of $40,000 = $7,200; PA of $10,000 would go negative -> floored to 0.
+        let (room, _) = new_room_for_year(&yd(2024, dollars(40_000), dollars(10_000), 0));
+        assert_eq!(room, 0);
+    }
+
+    #[test]
+    fn buffer_boundary_is_exact_to_the_cent() {
+        // Exactly $2,000 over -> still within buffer, no penalty.
+        let r = compute(&[yd(2024, dollars(50_000), 0, dollars(11_000))], 0);
+        assert_eq!(r[0].closing_room, dollars(-2_000));
+        assert_eq!(r[0].over_contribution, 0);
+        // One cent past the buffer -> 1 cent of excess.
+        let r = compute(
+            &[YearData {
+                year: 2024,
+                prior_year_earned_income: dollars(50_000),
+                pension_adjustment: 0,
+                contribution: dollars(11_000) + 1,
+                dollar_limit: annual_dollar_limit(2024),
+            }],
+            0,
+        );
+        assert_eq!(r[0].over_contribution, 1);
+    }
+
+    #[test]
+    fn over_contribution_persists_then_recovers_next_year() {
+        // 2024: room $9,000, contribute $15,000 -> -$6,000 (over by $4,000 past buffer).
+        // 2025: +$9,000 new room -> closing -$6,000 + $9,000 = $3,000, recovered.
+        let years = vec![
+            yd(2024, dollars(50_000), 0, dollars(15_000)),
+            yd(2025, dollars(50_000), 0, 0),
+        ];
+        let r = compute(&years, 0);
+        assert_eq!(r[0].closing_room, dollars(-6_000));
+        assert_eq!(r[0].over_contribution, dollars(4_000));
+        assert_eq!(r[1].opening_room, dollars(-6_000));
+        assert_eq!(r[1].closing_room, dollars(3_000));
+        assert_eq!(r[1].over_contribution, 0);
     }
 }

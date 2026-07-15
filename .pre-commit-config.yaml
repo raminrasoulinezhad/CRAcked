@@ -1,0 +1,51 @@
+# Pre-commit hooks for CRAcked. Install once:
+#   pip install pre-commit && pre-commit install && pre-commit install --hook-type pre-push
+#
+# Fast checks (formatting, lint, hygiene) run on every commit; the Rust test
+# suite runs on push (it compiles, so it's heavier).
+minimum_pre_commit_version: "3.0.0"
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=5000"]
+
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt (check)
+        entry: bash -c 'cd src-tauri && cargo fmt --check'
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy (-D warnings)
+        entry: bash -c 'cd src-tauri && cargo clippy --all-targets -- -D warnings'
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier (check)
+        entry: npx --yes prettier@3 --check
+        language: system
+        files: '\.(js|css|html|json|ya?ml|md)$'
+        exclude: "^src-tauri/(target|gen|binaries)/"
+
+      - id: cargo-test
+        name: cargo test
+        entry: bash -c 'cd src-tauri && cargo test'
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-push]

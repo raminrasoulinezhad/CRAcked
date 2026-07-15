@@ -110,7 +110,8 @@ fn signature(repo: &Repository) -> Result<Signature<'static>, String> {
 fn write_snapshot(conn: &Connection, dir: &Path) -> Result<(), String> {
     let snapshot = db::export_json(conn).map_err(|e| format!("export: {e}"))?;
     let pretty = serde_json::to_string_pretty(&snapshot).map_err(|e| format!("json: {e}"))?;
-    std::fs::write(dir.join("snapshot.json"), pretty).map_err(|e| format!("write snapshot: {e}"))?;
+    std::fs::write(dir.join("snapshot.json"), pretty)
+        .map_err(|e| format!("write snapshot: {e}"))?;
 
     // A small README so the Drive folder is self-explanatory if ever inspected.
     let readme = "# CRAcked data backup\n\nThis directory is a git repository holding your CRAcked data.\n\n- `snapshot.json` — human-readable snapshot (full version history is in git).\n- `cracked.db` — the SQLite database used by the app.\n\nRestore: copy this whole folder back to the app's data directory.\n";
@@ -130,7 +131,9 @@ fn git_commit(dir: &Path, message: &str) -> Result<bool, String> {
         .map_err(|e| format!("add_all: {e}"))?;
     index.write().map_err(|e| format!("index write: {e}"))?;
     let tree_oid = index.write_tree().map_err(|e| format!("write_tree: {e}"))?;
-    let tree = repo.find_tree(tree_oid).map_err(|e| format!("find_tree: {e}"))?;
+    let tree = repo
+        .find_tree(tree_oid)
+        .map_err(|e| format!("find_tree: {e}"))?;
 
     // Find the current HEAD commit, if any, as the parent.
     let parent = match repo.head() {
@@ -156,7 +159,11 @@ fn git_commit(dir: &Path, message: &str) -> Result<bool, String> {
 /// (the sidecar shipped in the installer), falling back to a system `rclone` on
 /// PATH (handy during development).
 fn rclone_program() -> OsString {
-    let name = if cfg!(windows) { "rclone.exe" } else { "rclone" };
+    let name = if cfg!(windows) {
+        "rclone.exe"
+    } else {
+        "rclone"
+    };
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let candidate = dir.join(name);
@@ -180,14 +187,21 @@ fn rclone_copy(cfg: &BackupConfig) -> (bool, String) {
         Ok(out) if out.status.success() => (true, format!("Copied to {dest}")),
         Ok(out) => (
             false,
-            format!("rclone failed: {}", String::from_utf8_lossy(&out.stderr).trim()),
+            format!(
+                "rclone failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ),
         ),
         Err(e) => (false, format!("rclone not run: {e}")),
     }
 }
 
 /// Full backup: snapshot -> local commit -> (optional) Drive copy.
-pub fn back_up(conn: &Connection, cfg: &BackupConfig, message: &str) -> Result<BackupReport, String> {
+pub fn back_up(
+    conn: &Connection,
+    cfg: &BackupConfig,
+    message: &str,
+) -> Result<BackupReport, String> {
     ensure_repo(&cfg.dir)?;
     write_snapshot(conn, &cfg.dir)?;
     let committed = git_commit(&cfg.dir, message)?;
@@ -245,14 +259,47 @@ mod tests {
         ensure_repo(&tmp).unwrap();
 
         std::fs::write(tmp.join("snapshot.json"), "{\"a\":1}").unwrap();
-        assert!(git_commit(&tmp, "first").unwrap(), "first write should commit");
+        assert!(
+            git_commit(&tmp, "first").unwrap(),
+            "first write should commit"
+        );
         // No change -> no commit.
-        assert!(!git_commit(&tmp, "again").unwrap(), "no change should not commit");
+        assert!(
+            !git_commit(&tmp, "again").unwrap(),
+            "no change should not commit"
+        );
         // Change -> commit.
         std::fs::write(tmp.join("snapshot.json"), "{\"a\":2}").unwrap();
-        assert!(git_commit(&tmp, "second").unwrap(), "changed write should commit");
+        assert!(
+            git_commit(&tmp, "second").unwrap(),
+            "changed write should commit"
+        );
 
         assert_eq!(commit_count(&tmp), 2, "exactly two commits expected");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn back_up_writes_snapshot_commits_and_skips_disabled_rclone() {
+        let tmp = std::env::temp_dir().join(format!("cracked_backup_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let conn = db::open_in_memory().unwrap();
+        let cfg = BackupConfig {
+            dir: tmp.clone(),
+            rclone_remote: String::new(),
+            rclone_folder: "CRAcked".into(),
+        };
+
+        let report = back_up(&conn, &cfg, "test snapshot").unwrap();
+        assert!(report.committed);
+        assert!(!report.rclone_attempted); // no remote configured
+        assert!(tmp.join("snapshot.json").exists());
+        assert!(tmp.join(".git").exists());
+
+        // No data changed -> no second commit.
+        let report2 = back_up(&conn, &cfg, "again").unwrap();
+        assert!(!report2.committed);
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

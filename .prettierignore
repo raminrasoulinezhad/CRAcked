@@ -1,0 +1,17 @@
+# Build output & deps
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+node_modules/
+
+# Local / editor
+.claude/
+
+# Binary assets
+*.png
+*.ico
+*.icns
+*.svg
+
+# Lockfiles
+src-tauri/Cargo.lock
