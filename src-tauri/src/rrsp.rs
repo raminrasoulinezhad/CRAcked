@@ -135,6 +135,20 @@ fn eighteen_percent(income: Cents) -> Cents {
     (income * 18 + 50) / 100
 }
 
+/// Compute the new room that a given prior-year income would generate under a
+/// given dollar limit. Returns `(room, limit_known)`. Used for the current-year
+/// projection where the income is an estimate. `dollar_limit` is the limit for
+/// the year the room applies to.
+pub fn new_room(prior_year_income: Cents, dollar_limit: Option<Cents>, pension_adjustment: Cents) -> (Cents, bool) {
+    new_room_for_year(&YearData {
+        year: 0,
+        prior_year_earned_income: prior_year_income,
+        pension_adjustment,
+        contribution: 0,
+        dollar_limit,
+    })
+}
+
 /// Compute the new room a year grants, and whether the dollar limit was known.
 fn new_room_for_year(data: &YearData) -> (Cents, bool) {
     let income_based = eighteen_percent(data.prior_year_earned_income);

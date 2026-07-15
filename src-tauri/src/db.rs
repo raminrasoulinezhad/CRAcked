@@ -77,6 +77,7 @@ const SCHEMA: &str = r#"
         year                     INTEGER NOT NULL,
         earned_income_cents      INTEGER NOT NULL DEFAULT 0,
         pension_adjustment_cents INTEGER NOT NULL DEFAULT 0,
+        is_estimate              INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (person_id, year)
     );
 
@@ -142,6 +143,12 @@ fn migrate(conn: &Connection) -> Result<()> {
 
     if needs_v2 {
         migrate_v1_to_v2(conn)?;
+    }
+    // v3 -> v4: estimated current-year income flag.
+    if !column_exists(conn, "annual_income", "is_estimate")? {
+        conn.execute_batch(
+            "ALTER TABLE annual_income ADD COLUMN is_estimate INTEGER NOT NULL DEFAULT 0;",
+        )?;
     }
     ensure_default_person(conn)?;
     Ok(())
@@ -381,23 +388,50 @@ pub struct AnnualIncome {
     pub year: i32,
     pub earned_income_cents: Cents,
     pub pension_adjustment_cents: Cents,
+    /// True when this is an estimate for a not-yet-final (current) year.
+    #[serde(default)]
+    pub is_estimate: bool,
 }
 
 pub fn upsert_annual_income(conn: &Connection, person_id: i64, income: &AnnualIncome) -> Result<()> {
     conn.execute(
-        "INSERT INTO annual_income(person_id, year, earned_income_cents, pension_adjustment_cents)
-         VALUES(?1, ?2, ?3, ?4)
+        "INSERT INTO annual_income(person_id, year, earned_income_cents, pension_adjustment_cents, is_estimate)
+         VALUES(?1, ?2, ?3, ?4, ?5)
          ON CONFLICT(person_id, year) DO UPDATE SET
              earned_income_cents      = excluded.earned_income_cents,
-             pension_adjustment_cents = excluded.pension_adjustment_cents",
+             pension_adjustment_cents = excluded.pension_adjustment_cents,
+             is_estimate              = excluded.is_estimate",
         params![
             person_id,
             income.year,
             income.earned_income_cents,
-            income.pension_adjustment_cents
+            income.pension_adjustment_cents,
+            income.is_estimate as i64
         ],
     )?;
     Ok(())
+}
+
+/// Look up one person's income record for a specific year.
+pub fn get_annual_income(conn: &Connection, person_id: i64, year: i32) -> Result<Option<AnnualIncome>> {
+    conn.query_row(
+        "SELECT year, earned_income_cents, pension_adjustment_cents, is_estimate
+         FROM annual_income WHERE person_id = ?1 AND year = ?2",
+        params![person_id, year],
+        |row| {
+            Ok(AnnualIncome {
+                year: row.get(0)?,
+                earned_income_cents: row.get(1)?,
+                pension_adjustment_cents: row.get(2)?,
+                is_estimate: row.get::<_, i64>(3)? != 0,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other),
+    })
 }
 
 pub fn delete_annual_income(conn: &Connection, person_id: i64, year: i32) -> Result<()> {
@@ -410,7 +444,7 @@ pub fn delete_annual_income(conn: &Connection, person_id: i64, year: i32) -> Res
 
 pub fn list_annual_income(conn: &Connection, person_id: i64) -> Result<Vec<AnnualIncome>> {
     let mut stmt = conn.prepare(
-        "SELECT year, earned_income_cents, pension_adjustment_cents
+        "SELECT year, earned_income_cents, pension_adjustment_cents, is_estimate
          FROM annual_income WHERE person_id = ?1 ORDER BY year",
     )?;
     let rows = stmt.query_map(params![person_id], |row| {
@@ -418,6 +452,7 @@ pub fn list_annual_income(conn: &Connection, person_id: i64) -> Result<Vec<Annua
             year: row.get(0)?,
             earned_income_cents: row.get(1)?,
             pension_adjustment_cents: row.get(2)?,
+            is_estimate: row.get::<_, i64>(3)? != 0,
         })
     })?;
     rows.collect()
@@ -708,7 +743,7 @@ pub fn export_json(conn: &Connection) -> Result<serde_json::Value> {
     let mut annual_income: Vec<serde_json::Value> = Vec::new();
     {
         let mut stmt = conn.prepare(
-            "SELECT person_id, year, earned_income_cents, pension_adjustment_cents
+            "SELECT person_id, year, earned_income_cents, pension_adjustment_cents, is_estimate
              FROM annual_income ORDER BY person_id, year",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -717,6 +752,7 @@ pub fn export_json(conn: &Connection) -> Result<serde_json::Value> {
                 "year": row.get::<_, i32>(1)?,
                 "earned_income_cents": row.get::<_, Cents>(2)?,
                 "pension_adjustment_cents": row.get::<_, Cents>(3)?,
+                "is_estimate": row.get::<_, i64>(4)? != 0,
             }))
         })?;
         for r in rows {
@@ -837,7 +873,7 @@ mod tests {
     fn annual_income_upsert_and_delete() {
         let conn = open_in_memory().unwrap();
         let me = p(&conn);
-        upsert_annual_income(&conn, me, &AnnualIncome { year: 2023, earned_income_cents: 55_000_00, pension_adjustment_cents: 0 }).unwrap();
+        upsert_annual_income(&conn, me, &AnnualIncome { year: 2023, earned_income_cents: 55_000_00, pension_adjustment_cents: 0, is_estimate: false }).unwrap();
         assert_eq!(list_annual_income(&conn, me).unwrap().len(), 1);
         delete_annual_income(&conn, me, 2023).unwrap();
         assert!(list_annual_income(&conn, me).unwrap().is_empty());
@@ -869,7 +905,7 @@ mod tests {
     fn rrsp_year_data_maps_prior_year_income_and_limit() {
         let conn = open_in_memory().unwrap();
         let me = p(&conn);
-        upsert_annual_income(&conn, me, &AnnualIncome { year: 2023, earned_income_cents: 50_000_00, pension_adjustment_cents: 0 }).unwrap();
+        upsert_annual_income(&conn, me, &AnnualIncome { year: 2023, earned_income_cents: 50_000_00, pension_adjustment_cents: 0, is_estimate: false }).unwrap();
         add_contribution(&conn, me, "RRSP", 2024, "2024-02-01", 3_000_00, "").unwrap();
         let data = rrsp_year_data(&conn, me).unwrap();
         assert_eq!(data.len(), 1);

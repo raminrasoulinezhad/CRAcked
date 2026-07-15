@@ -420,6 +420,28 @@ details.collapse > *:last-child {
   color: var(--warn);
 }
 
+/* ---- projection panel ---- */
+.panel.projection {
+  border-color: var(--teal-dim);
+  background: linear-gradient(160deg, #1b3330, var(--panel));
+}
+.panel.projection p {
+  margin: 0.35rem 0;
+}
+.panel.projection .accrued {
+  font-size: 1.15rem;
+  color: var(--gold);
+}
+label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+label.check input {
+  width: auto;
+}
+
 /* ---- danger button ---- */
 button.danger {
   background: transparent;

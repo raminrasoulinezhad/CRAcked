@@ -2,6 +2,14 @@ const { invoke } = window.__TAURI__.core;
 
 const currentYear = new Date().getFullYear();
 
+/** Fraction of the current calendar year elapsed (e.g. Apr 1 → 3/12 = 0.25). */
+function yearElapsedFraction(d = new Date()) {
+  const month = d.getMonth(); // 0-11
+  const daysInMonth = new Date(d.getFullYear(), month + 1, 0).getDate();
+  return (month + (d.getDate() - 1) / daysInMonth) / 12;
+}
+const elapsedFraction = yearElapsedFraction();
+
 // The currently selected family member. All account data is scoped to this.
 let personId = null;
 
@@ -106,7 +114,7 @@ async function refreshPersons() {
 // ---- RRSP -----------------------------------------------------------------
 
 async function refreshRrsp() {
-  const s = await invoke("get_rrsp_summary", { personId, currentYear });
+  const s = await invoke("get_rrsp_summary", { personId, currentYear, elapsedFraction });
 
   const roomEl = document.querySelector("#rrsp-room");
   roomEl.textContent = fmt(s.current_room);
@@ -167,6 +175,22 @@ async function refreshRrsp() {
     .map((m) => `<div class="warning">${m}</div>`)
     .join("");
 
+  // Current-year accrual projection (informational — separate from room left)
+  const projPanel = document.querySelector("#rrsp-projection");
+  if (s.projection) {
+    const p = s.projection;
+    const pct = Math.round(p.elapsed_fraction * 100);
+    const kind = p.is_estimate ? "estimated" : "actual";
+    projPanel.hidden = false;
+    document.querySelector("#rrsp-projection-body").innerHTML = `
+      <p>From your <strong>${kind}</strong> ${p.income_year} income of ${fmt(p.income)}, you're building
+      <strong>${fmt(p.projected_new_room)}</strong> of new room for <strong>${p.applies_to_year}</strong>${p.dollar_limit_missing ? ' <span class="flag err">(uncapped — no limit on record)</span>' : ""}.</p>
+      <p class="accrued">Accrued so far (~${pct}% through ${p.income_year}): <strong>${fmt(p.accrued_to_date)}</strong></p>
+      <p class="hint">This becomes contributable in ${p.applies_to_year}; it's not part of your “room left” above. Update the ${p.income_year} income when it's final.</p>`;
+  } else {
+    projPanel.hidden = true;
+  }
+
   // Income list
   const incomes = await invoke("list_annual_income", { personId });
   const incomeEl = document.querySelector("#rrsp-income-list");
@@ -177,7 +201,8 @@ async function refreshRrsp() {
           const pa = i.pension_adjustment_cents > 0
             ? ` <span class="muted">(PA ${fmt(i.pension_adjustment_cents)})</span>`
             : "";
-          return `<li><span><strong>${i.year}</strong> — ${fmt(i.earned_income_cents)}${pa}</span> ${delBtn("del-income", { year: i.year })}</li>`;
+          const est = i.is_estimate ? ' <span class="flag">estimate</span>' : "";
+          return `<li><span><strong>${i.year}</strong> — ${fmt(i.earned_income_cents)}${pa}${est}</span> ${delBtn("del-income", { year: i.year })}</li>`;
         })
         .join("");
 
@@ -416,6 +441,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       year: Number(f.querySelector("#rrsp-income-year").value),
       earnedIncomeCents: toCents(f.querySelector("#rrsp-income-amount").value),
       pensionAdjustmentCents: toCents(f.querySelector("#rrsp-income-pa").value || 0),
+      isEstimate: f.querySelector("#rrsp-income-estimate").checked,
     });
     f.reset();
     await refreshRrsp();

@@ -84,6 +84,29 @@ struct RrspSummary {
     opening_room: Cents,
     missing_limit_years: Vec<i32>,
     latest_built_in_year: i32,
+    /// Forward-looking projection of the room the current year is building
+    /// (from an estimated or actual current-year income). Informational only —
+    /// it does NOT change `current_room`.
+    projection: Option<RrspProjection>,
+}
+
+/// The current year's accruing-room projection.
+#[derive(Debug, Serialize)]
+struct RrspProjection {
+    /// The year whose income drives this (the current year).
+    income_year: i32,
+    /// The year this new room actually becomes available (income_year + 1).
+    applies_to_year: i32,
+    income: Cents,
+    is_estimate: bool,
+    /// Full-year new room this income would generate.
+    projected_new_room: Cents,
+    /// Pro-rated to how far through the year we are (`projected × fraction`).
+    accrued_to_date: Cents,
+    /// Fraction of the current year elapsed (0..1), as supplied by the UI.
+    elapsed_fraction: f64,
+    /// True if we had no dollar limit for `applies_to_year` (room uncapped).
+    dollar_limit_missing: bool,
 }
 
 #[tauri::command]
@@ -91,6 +114,7 @@ fn get_rrsp_summary(
     state: State<AppState>,
     person_id: i64,
     current_year: i32,
+    elapsed_fraction: f64,
 ) -> Result<RrspSummary, String> {
     let conn = state.db.lock().map_err(to_err)?;
     let opening_room = db::get_rrsp_opening_room(&conn, person_id).map_err(to_err)?;
@@ -106,6 +130,30 @@ fn get_rrsp_summary(
         .map(|y| y.year)
         .collect();
 
+    // Projection: the current year's income (estimated or actual) builds room
+    // for next year; pro-rate it to how far through the year we are.
+    let overrides = db::list_rrsp_dollar_limit_overrides(&conn).map_err(to_err)?;
+    let projection = db::get_annual_income(&conn, person_id, current_year)
+        .map_err(to_err)?
+        .map(|inc| {
+            let applies_to = current_year + 1;
+            let limit = db::resolve_rrsp_limit(&overrides, applies_to);
+            let (projected, known) =
+                rrsp::new_room(inc.earned_income_cents, limit, inc.pension_adjustment_cents);
+            let frac = elapsed_fraction.clamp(0.0, 1.0);
+            let accrued = (projected as f64 * frac).round() as Cents;
+            RrspProjection {
+                income_year: current_year,
+                applies_to_year: applies_to,
+                income: inc.earned_income_cents,
+                is_estimate: inc.is_estimate,
+                projected_new_room: projected,
+                accrued_to_date: accrued,
+                elapsed_fraction: frac,
+                dollar_limit_missing: !known,
+            }
+        });
+
     Ok(RrspSummary {
         years,
         current_room,
@@ -114,6 +162,7 @@ fn get_rrsp_summary(
         opening_room,
         missing_limit_years,
         latest_built_in_year: rrsp::latest_known_limit_year(),
+        projection,
     })
 }
 
@@ -124,12 +173,13 @@ fn upsert_annual_income(
     year: i32,
     earned_income_cents: Cents,
     pension_adjustment_cents: Cents,
+    is_estimate: bool,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(to_err)?;
     db::upsert_annual_income(
         &conn,
         person_id,
-        &AnnualIncome { year, earned_income_cents, pension_adjustment_cents },
+        &AnnualIncome { year, earned_income_cents, pension_adjustment_cents, is_estimate },
     )
     .map_err(to_err)?;
     auto_backup(&conn, &format!("Set {year} earned income"));

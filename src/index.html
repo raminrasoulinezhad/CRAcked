@@ -52,6 +52,11 @@
 
         <div id="rrsp-warnings" class="warnings"></div>
 
+        <section class="panel projection" id="rrsp-projection" hidden>
+          <h2>This year's accrual <span class="muted">— projection</span></h2>
+          <div id="rrsp-projection-body"></div>
+        </section>
+
         <section class="panel">
           <h2>Add a contribution</h2>
           <form id="rrsp-contrib-form" class="row-form">
@@ -92,8 +97,10 @@
             <label>Year <input type="number" id="rrsp-income-year" min="1990" max="2100" placeholder="2023" required /></label>
             <label>Earned income ($) <input type="number" id="rrsp-income-amount" min="0" step="0.01" placeholder="65000" required /></label>
             <label>Pension adj. ($) <input type="number" id="rrsp-income-pa" min="0" step="0.01" placeholder="0" /></label>
+            <label class="check"><input type="checkbox" id="rrsp-income-estimate" /> Estimate <span class="muted">(not final)</span></label>
             <button type="submit">Save income</button>
           </form>
+          <p class="hint">Tick <strong>Estimate</strong> for the current year before you know your final income — CRAcked shows the room you're building, pro-rated to today. Replace it with the real number later.</p>
           <ul id="rrsp-income-list" class="mini-list"></ul>
         </details>
 
