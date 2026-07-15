@@ -16,150 +16,304 @@
       </div>
     </header>
 
+    <div class="person-bar" id="person-bar">
+      <label>Family member
+        <select id="person-select"></select>
+      </label>
+      <button type="button" id="person-add" class="secondary small">+ Add</button>
+      <button type="button" id="person-rename" class="secondary small">Rename</button>
+      <button type="button" id="person-delete" class="danger small">Delete</button>
+    </div>
+
     <nav class="tabs">
       <button class="tab active" data-account="RRSP">RRSP</button>
-      <button class="tab" data-account="TFSA" disabled title="Coming soon">TFSA</button>
-      <button class="tab" data-account="FHSA" disabled title="Coming soon">FHSA</button>
+      <button class="tab" data-account="TFSA">TFSA</button>
+      <button class="tab" data-account="FHSA">FHSA</button>
+      <button class="tab tab-right" data-account="Backup">Backup</button>
     </nav>
 
     <main>
-      <!-- Headline cards -->
-      <section class="cards">
-        <div class="card headline">
-          <span class="card-label">Contribution room left</span>
-          <span class="card-value" id="current-room">—</span>
-        </div>
-        <div class="card">
-          <span class="card-label">Total contributed</span>
-          <span class="card-value" id="total-contributed">—</span>
-        </div>
-        <div class="card" id="over-card" hidden>
-          <span class="card-label">⚠️ Over-contribution</span>
-          <span class="card-value warn" id="over-amount">—</span>
-        </div>
-      </section>
-
-      <div id="warnings" class="warnings"></div>
-
-      <!-- Year-by-year breakdown -->
-      <section class="panel">
-        <h2>Year-by-year room</h2>
-        <div class="table-wrap">
-          <table id="year-table">
-            <thead>
-              <tr>
-                <th>Year</th>
-                <th class="num">Opening room</th>
-                <th class="num">New room</th>
-                <th class="num">Available</th>
-                <th class="num">Contributed</th>
-                <th class="num">Closing room</th>
-              </tr>
-            </thead>
-            <tbody id="year-body">
-              <tr><td colspan="6" class="empty">No data yet — add income and contributions below.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <div class="two-col">
-        <!-- Annual income -->
-        <section class="panel">
-          <h2>Annual earned income</h2>
-          <p class="hint">Income earned in a year drives the <strong>next</strong> year's RRSP room (18% of it, up to the annual cap).</p>
-          <form id="income-form" class="stack">
-            <label>Year
-              <input type="number" id="income-year" min="1990" max="2100" placeholder="2023" required />
-            </label>
-            <label>Earned income ($)
-              <input type="number" id="income-amount" min="0" step="0.01" placeholder="65000" required />
-            </label>
-            <label>Pension adjustment ($) <span class="muted">— optional, from your T4</span>
-              <input type="number" id="income-pa" min="0" step="0.01" placeholder="0" />
-            </label>
-            <button type="submit">Save income</button>
-          </form>
-          <ul id="income-list" class="mini-list"></ul>
+      <!-- ============================= RRSP ============================= -->
+      <section class="account-view" data-view="RRSP">
+        <section class="cards">
+          <div class="card headline">
+            <span class="card-label">Contribution room left</span>
+            <span class="card-value" id="rrsp-room">—</span>
+          </div>
+          <div class="card">
+            <span class="card-label">Total contributed</span>
+            <span class="card-value" id="rrsp-total">—</span>
+          </div>
+          <div class="card" id="rrsp-over-card" hidden>
+            <span class="card-label">⚠️ Over-contribution</span>
+            <span class="card-value warn" id="rrsp-over">—</span>
+          </div>
         </section>
 
-        <!-- Contributions -->
+        <div id="rrsp-warnings" class="warnings"></div>
+
         <section class="panel">
           <h2>Add a contribution</h2>
-          <form id="contrib-form" class="stack">
-            <label>Tax year
-              <input type="number" id="contrib-year" min="1990" max="2100" placeholder="2024" required />
-            </label>
-            <label>Date
-              <input type="date" id="contrib-date" required />
-            </label>
-            <label>Amount ($)
-              <input type="number" id="contrib-amount" min="0" step="0.01" placeholder="5000" required />
-            </label>
-            <label>Note <span class="muted">— optional</span>
-              <input type="text" id="contrib-note" placeholder="e.g. year-end top-up" />
-            </label>
-            <button type="submit">Add contribution</button>
+          <form id="rrsp-contrib-form" class="row-form">
+            <label>Tax year <input type="number" id="rrsp-contrib-year" min="1990" max="2100" placeholder="2024" required /></label>
+            <label>Date <input type="date" id="rrsp-contrib-date" required /></label>
+            <label>Amount ($) <input type="number" id="rrsp-contrib-amount" min="0" step="0.01" placeholder="5000" required /></label>
+            <label>Note <input type="text" id="rrsp-contrib-note" placeholder="optional" /></label>
+            <button type="submit">Add</button>
           </form>
         </section>
-      </div>
 
-      <!-- Contribution log -->
-      <section class="panel">
-        <h2>Contribution log</h2>
-        <div class="table-wrap">
-          <table id="contrib-table">
-            <thead>
-              <tr>
-                <th>Tax year</th>
-                <th>Date</th>
-                <th class="num">Amount</th>
-                <th>Note</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="contrib-body">
-              <tr><td colspan="5" class="empty">No contributions logged yet.</td></tr>
-            </tbody>
-          </table>
+        <section class="panel">
+          <h2>Contribution log</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tax year</th><th>Date</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+              <tbody id="rrsp-contrib-body"><tr><td colspan="5" class="empty">No contributions logged yet.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <details class="collapse">
+          <summary>Year-by-year room</summary>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Year</th><th class="num">Opening room</th><th class="num">New room</th><th class="num">Available</th><th class="num">Contributed</th><th class="num">Closing room</th></tr>
+              </thead>
+              <tbody id="rrsp-year-body"><tr><td colspan="6" class="empty">No data yet.</td></tr></tbody>
+            </table>
+          </div>
+        </details>
+
+        <details class="collapse">
+          <summary>Earned income <span class="muted">— drives your room</span></summary>
+          <p class="hint">Income earned in a year drives the <strong>next</strong> year's RRSP room (18%, up to the annual cap).</p>
+          <form id="rrsp-income-form" class="row-form">
+            <label>Year <input type="number" id="rrsp-income-year" min="1990" max="2100" placeholder="2023" required /></label>
+            <label>Earned income ($) <input type="number" id="rrsp-income-amount" min="0" step="0.01" placeholder="65000" required /></label>
+            <label>Pension adj. ($) <input type="number" id="rrsp-income-pa" min="0" step="0.01" placeholder="0" /></label>
+            <button type="submit">Save income</button>
+          </form>
+          <ul id="rrsp-income-list" class="mini-list"></ul>
+        </details>
+
+        <details class="collapse">
+          <summary>Starting room &amp; annual dollar limits</summary>
+          <div class="two-col">
+            <div>
+              <p class="hint">Unused RRSP room carried in <em>before</em> the earliest year you track (from your CRA Notice of Assessment). $0 if starting fresh.</p>
+              <form id="rrsp-opening-form" class="inline">
+                <label>Opening room ($) <input type="number" id="rrsp-opening-room" min="0" step="0.01" placeholder="0" /></label>
+                <button type="submit">Save</button>
+              </form>
+            </div>
+            <div>
+              <p class="hint">CRAcked ships CRA limits through <span id="rrsp-latest-year">—</span>. If a year you've reached has no limit, add it here.</p>
+              <form id="rrsp-limit-form" class="inline">
+                <label>Year <input type="number" id="rrsp-limit-year" min="1990" max="2100" placeholder="2027" required /></label>
+                <label>Dollar limit ($) <input type="number" id="rrsp-limit-amount" min="0" step="0.01" placeholder="34000" required /></label>
+                <button type="submit">Save limit</button>
+              </form>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- ============================= TFSA ============================= -->
+      <section class="account-view" data-view="TFSA" hidden>
+        <div id="tfsa-setup" class="setup-notice" hidden>
+          <h2>Set up your TFSA</h2>
+          <p>Tell CRAcked the first year you were eligible for a TFSA — the year you turned 18 and became a Canadian resident (earliest 2009). Room accrues every year from then.</p>
+          <form id="tfsa-setup-form" class="inline">
+            <label>Eligibility start year <input type="number" id="tfsa-setup-year" min="2009" max="2100" placeholder="2015" required /></label>
+            <button type="submit">Start tracking</button>
+          </form>
+        </div>
+
+        <div id="tfsa-body" hidden>
+          <section class="cards">
+            <div class="card headline"><span class="card-label">Contribution room left</span><span class="card-value" id="tfsa-room">—</span></div>
+            <div class="card"><span class="card-label">Total contributed</span><span class="card-value" id="tfsa-total">—</span></div>
+            <div class="card"><span class="card-label">Total withdrawn</span><span class="card-value" id="tfsa-withdrawn">—</span></div>
+            <div class="card" id="tfsa-over-card" hidden><span class="card-label">⚠️ Over-contribution</span><span class="card-value warn" id="tfsa-over">—</span></div>
+          </section>
+
+          <div id="tfsa-warnings" class="warnings"></div>
+
+          <section class="panel">
+            <h2>Add a contribution</h2>
+            <form id="tfsa-contrib-form" class="row-form">
+              <label>Tax year <input type="number" id="tfsa-contrib-year" min="2009" max="2100" required /></label>
+              <label>Date <input type="date" id="tfsa-contrib-date" required /></label>
+              <label>Amount ($) <input type="number" id="tfsa-contrib-amount" min="0" step="0.01" required /></label>
+              <label>Note <input type="text" id="tfsa-contrib-note" placeholder="optional" /></label>
+              <button type="submit">Add</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <h2>Contribution log</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Year</th><th>Date</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+                <tbody id="tfsa-contrib-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <details class="collapse">
+            <summary>Year-by-year room</summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Year</th><th class="num">Opening</th><th class="num">New room</th><th class="num">Re-added</th><th class="num">Available</th><th class="num">Contributed</th><th class="num">Withdrawn</th><th class="num">Closing</th></tr>
+                </thead>
+                <tbody id="tfsa-year-body"></tbody>
+              </table>
+            </div>
+            <p class="hint">💡 “Re-added” is the prior year's withdrawals returning to your room on Jan 1.</p>
+          </details>
+
+          <details class="collapse">
+            <summary>Withdrawals</summary>
+            <p class="hint">Withdrawals free up room again — but only on <strong>January 1 of next year</strong>.</p>
+            <form id="tfsa-withdraw-form" class="row-form">
+              <label>Tax year <input type="number" id="tfsa-withdraw-year" min="2009" max="2100" required /></label>
+              <label>Date <input type="date" id="tfsa-withdraw-date" required /></label>
+              <label>Amount ($) <input type="number" id="tfsa-withdraw-amount" min="0" step="0.01" required /></label>
+              <label>Note <input type="text" id="tfsa-withdraw-note" placeholder="optional" /></label>
+              <button type="submit">Add</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Year</th><th>Date</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+                <tbody id="tfsa-withdraw-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="collapse">
+            <summary>Settings</summary>
+            <form id="tfsa-settings-form" class="inline">
+              <label>Eligibility start year <input type="number" id="tfsa-start-year" min="2009" max="2100" /></label>
+              <label>Opening room before that year ($) <input type="number" id="tfsa-opening-room" min="0" step="0.01" placeholder="0" /></label>
+              <button type="submit">Save</button>
+            </form>
+          </details>
         </div>
       </section>
 
-      <!-- Settings -->
-      <section class="panel">
-        <h2>Starting room</h2>
-        <p class="hint">Unused RRSP room you carried in <em>before</em> the earliest year you track here (from your CRA Notice of Assessment). Leave at $0 if starting fresh.</p>
-        <form id="opening-form" class="inline">
-          <label>Opening unused room ($)
-            <input type="number" id="opening-room" min="0" step="0.01" placeholder="0" />
-          </label>
-          <button type="submit">Save</button>
-        </form>
+      <!-- ============================= FHSA ============================= -->
+      <section class="account-view" data-view="FHSA" hidden>
+        <div id="fhsa-setup" class="setup-notice" hidden>
+          <h2>Set up your FHSA</h2>
+          <p>Tell CRAcked the year you opened your first FHSA. Room ($8,000/year, up to $40,000 lifetime) starts accruing that year.</p>
+          <form id="fhsa-setup-form" class="inline">
+            <label>Year opened <input type="number" id="fhsa-setup-year" min="2023" max="2100" placeholder="2023" required /></label>
+            <button type="submit">Start tracking</button>
+          </form>
+        </div>
+
+        <div id="fhsa-body" hidden>
+          <section class="cards">
+            <div class="card headline"><span class="card-label">Room left this year</span><span class="card-value" id="fhsa-room">—</span></div>
+            <div class="card"><span class="card-label">Lifetime room remaining</span><span class="card-value" id="fhsa-lifetime">—</span></div>
+            <div class="card"><span class="card-label">Total contributed</span><span class="card-value" id="fhsa-total">—</span></div>
+            <div class="card" id="fhsa-over-card" hidden><span class="card-label">⚠️ Over-contribution</span><span class="card-value warn" id="fhsa-over">—</span></div>
+          </section>
+
+          <div id="fhsa-warnings" class="warnings"></div>
+
+          <section class="panel">
+            <h2>Add a contribution</h2>
+            <form id="fhsa-contrib-form" class="row-form">
+              <label>Tax year <input type="number" id="fhsa-contrib-year" min="2023" max="2100" required /></label>
+              <label>Date <input type="date" id="fhsa-contrib-date" required /></label>
+              <label>Amount ($) <input type="number" id="fhsa-contrib-amount" min="0" step="0.01" required /></label>
+              <label>Note <input type="text" id="fhsa-contrib-note" placeholder="optional" /></label>
+              <button type="submit">Add</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <h2>Contribution log</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Year</th><th>Date</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+                <tbody id="fhsa-contrib-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <details class="collapse">
+            <summary>Year-by-year room</summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Year</th><th class="num">Carried in</th><th class="num">New grant</th><th class="num">Available</th><th class="num">Contributed</th><th class="num">Closing</th><th class="num">Lifetime used</th></tr>
+                </thead>
+                <tbody id="fhsa-year-body"></tbody>
+              </table>
+            </div>
+            <p class="hint">💡 Carry-forward is capped at $8,000, so the most you can contribute in one year is $16,000.</p>
+          </details>
+
+          <details class="collapse">
+            <summary>Withdrawals</summary>
+            <p class="hint">Tracked for your records. FHSA withdrawals do <strong>not</strong> restore contribution room.</p>
+            <form id="fhsa-withdraw-form" class="row-form">
+              <label>Tax year <input type="number" id="fhsa-withdraw-year" min="2023" max="2100" required /></label>
+              <label>Date <input type="date" id="fhsa-withdraw-date" required /></label>
+              <label>Amount ($) <input type="number" id="fhsa-withdraw-amount" min="0" step="0.01" required /></label>
+              <label>Note <input type="text" id="fhsa-withdraw-note" placeholder="optional" /></label>
+              <button type="submit">Add</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Year</th><th>Date</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+                <tbody id="fhsa-withdraw-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="collapse">
+            <summary>Settings</summary>
+            <form id="fhsa-settings-form" class="inline">
+              <label>Year opened <input type="number" id="fhsa-open-year" min="2023" max="2100" /></label>
+              <button type="submit">Save</button>
+            </form>
+          </details>
+        </div>
       </section>
 
-      <!-- Backup -->
-      <section class="panel">
-        <h2>Backup</h2>
-        <p class="hint">
-          Your data lives in a git repository on this machine (full version history),
-          and is copied <strong>append-only</strong> to Google Drive — deleting files
-          locally can never remove them from the backup. Set up Drive once with
-          <code>rclone config</code> (see <code>BACKUP.md</code>), then enter the remote name below.
-        </p>
-        <p class="mono" id="backup-dir"></p>
-        <form id="backup-form" class="inline">
-          <label>rclone remote <span class="muted">— e.g. gdrive</span>
-            <input type="text" id="backup-remote" placeholder="gdrive" />
-          </label>
-          <label>Drive folder
-            <input type="text" id="backup-folder" placeholder="CRAcked" />
-          </label>
-          <button type="submit">Save backup settings</button>
-        </form>
-        <div class="backup-actions">
-          <button type="button" id="backup-now-btn" class="secondary">Back up now</button>
-          <span id="backup-status" class="muted"></span>
-        </div>
+      <!-- ============================= Backup ============================= -->
+      <section class="account-view" data-view="Backup" hidden>
+        <section class="panel">
+          <h2>Backup &amp; version history</h2>
+          <p class="hint">
+            Your data lives in a git repository on this machine with a full version history,
+            and is copied <strong>append-only</strong> to Google Drive — deleting files
+            locally can never remove them from the backup.
+          </p>
+          <p class="mono" id="backup-dir"></p>
+        </section>
+
+        <section class="panel">
+          <h2>Google Drive setup</h2>
+          <p class="hint">
+            One-time: run <code>rclone config</code> in a terminal and log into Google (name it <code>gdrive</code>).
+            Full instructions are in <code>BACKUP.md</code>. Then enter the remote here.
+          </p>
+          <form id="backup-form" class="inline">
+            <label>rclone remote <input type="text" id="backup-remote" placeholder="gdrive" /></label>
+            <label>Drive folder <input type="text" id="backup-folder" placeholder="CRAcked" /></label>
+            <button type="submit">Save backup settings</button>
+          </form>
+          <div class="backup-actions">
+            <button type="button" id="backup-now-btn" class="secondary">Back up now</button>
+            <span id="backup-status" class="muted"></span>
+          </div>
+        </section>
       </section>
 
       <p class="disclaimer">
@@ -168,5 +322,28 @@
         My Account.
       </p>
     </main>
+
+    <!-- Delete confirmation modal -->
+    <div id="confirm-overlay" class="overlay" hidden>
+      <div class="modal">
+        <p id="confirm-message">Are you sure?</p>
+        <div class="modal-actions">
+          <button type="button" id="confirm-cancel" class="secondary">Cancel</button>
+          <button type="button" id="confirm-ok" class="danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text prompt modal (add / rename person) -->
+    <div id="prompt-overlay" class="overlay" hidden>
+      <div class="modal">
+        <p id="prompt-message"></p>
+        <input type="text" id="prompt-input" />
+        <div class="modal-actions">
+          <button type="button" id="prompt-cancel" class="secondary">Cancel</button>
+          <button type="button" id="prompt-ok">OK</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

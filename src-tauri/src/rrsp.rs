@@ -10,7 +10,8 @@
 //!
 //! 1. **New room earned this year** =
 //!    `min( 18% of PRIOR year's earned income , annual dollar limit ) − pension adjustment`
-//!    (floored at 0).
+//!    (floored at 0). The **annual dollar limit** is the hard cap that turns
+//!    "18% of income" into a bounded number, and it changes every year.
 //! 2. **Unused room carried forward** from all prior years (indefinitely).
 //!
 //! `Available room = carried-forward unused room + new room`.
@@ -19,11 +20,15 @@
 //! contributions beyond `room + $2,000` attract a penalty tax of **1% per month**
 //! on the excess.
 //!
-//! Not modelled in this v1 (kept explicit so we can add them later): pension
-//! adjustment reversals (PAR), past-service pension adjustments (PSPA), the
-//! first-60-days deduction-timing rule, and the age-71 contribution cutoff.
-//! `earned_income` is taken as an input (its full CRA definition is out of scope
-//! for the engine — the app supplies the number).
+//! The annual dollar limit is passed in per year ([`YearData::dollar_limit`]),
+//! already resolved by the caller from a user override or the built-in
+//! [`annual_dollar_limit`] table. When it is `None` the year's limit is unknown
+//! and the result is flagged (`dollar_limit_missing`) so the app can require the
+//! user to supply it rather than guessing.
+//!
+//! Not modelled in this v1: pension adjustment reversals (PAR), past-service
+//! pension adjustments (PSPA), the first-60-days deduction-timing rule, and the
+//! age-71 contribution cutoff. `earned_income` is taken as an input.
 
 use serde::{Deserialize, Serialize};
 
@@ -39,9 +44,17 @@ pub const MONTHLY_PENALTY_RATE_PERCENT: i64 = 1;
 /// Published RRSP annual dollar limits (the maximum *new* room a year can grant,
 /// regardless of income), in whole dollars.
 ///
-/// VERIFY against the CRA and extend as new years are announced — these change
-/// every year. Source: CRA "MP, DB, RRSP, DPSP, ALDA, TFSA limits" table.
+/// These are CRA-published figures and **must be correct** — verify before
+/// adding a new year. Source: CRA "MP, DB, RRSP, DPSP, ALDA, TFSA limits".
 const ANNUAL_DOLLAR_LIMITS: &[(i32, i64)] = &[
+    (2010, 22_000),
+    (2011, 22_450),
+    (2012, 22_970),
+    (2013, 23_820),
+    (2014, 24_270),
+    (2015, 24_930),
+    (2016, 25_370),
+    (2017, 26_010),
     (2018, 26_230),
     (2019, 26_500),
     (2020, 27_230),
@@ -53,14 +66,24 @@ const ANNUAL_DOLLAR_LIMITS: &[(i32, i64)] = &[
     (2026, 33_810),
 ];
 
-/// The annual RRSP dollar limit for `year`, in cents, or `None` if we don't have
-/// a published figure for that year yet (the caller should surface a warning
-/// rather than silently guess).
+/// The built-in RRSP annual dollar limit for `year`, in cents, or `None` if the
+/// program ships no figure for that year (the caller must then require the user
+/// to supply it, or treat future years as projections).
 pub fn annual_dollar_limit(year: i32) -> Option<Cents> {
     ANNUAL_DOLLAR_LIMITS
         .iter()
         .find(|(y, _)| *y == year)
         .map(|(_, dollars)| *dollars * 100)
+}
+
+/// The most recent year for which a built-in limit exists (used to explain how
+/// current the shipped data is).
+pub fn latest_known_limit_year() -> i32 {
+    ANNUAL_DOLLAR_LIMITS
+        .iter()
+        .map(|(y, _)| *y)
+        .max()
+        .unwrap_or(0)
 }
 
 /// Per-year inputs the app collects. One entry per calendar year.
@@ -76,6 +99,10 @@ pub struct YearData {
     /// Total contributed toward this year's room.
     #[serde(default)]
     pub contribution: Cents,
+    /// The RRSP annual dollar limit for THIS year, in cents, already resolved
+    /// (user override → built-in table). `None` means it is unknown.
+    #[serde(default)]
+    pub dollar_limit: Option<Cents>,
 }
 
 /// The computed room picture for a single year.
@@ -96,15 +123,13 @@ pub struct YearComputation {
     /// Cumulative over-contribution beyond the $2,000 buffer (0 if within it).
     pub over_contribution: Cents,
     /// Estimated penalty for ONE month on the current excess (1% of the excess).
-    /// The real CRA penalty accrues per month the excess remains.
     pub estimated_monthly_penalty: Cents,
-    /// True when we had no published dollar limit for this year, so `new_room`
-    /// was computed from income alone (uncapped) — treat as an estimate.
+    /// True when this year's dollar limit was unknown, so `new_room` was computed
+    /// from income alone (uncapped) — the app should require the real figure.
     pub dollar_limit_missing: bool,
 }
 
-/// Round `income * 18%` to the nearest cent using integer math (income is
-/// non-negative cents, so no float rounding drift).
+/// Round `income * 18%` to the nearest cent using integer math.
 fn eighteen_percent(income: Cents) -> Cents {
     let income = income.max(0);
     (income * 18 + 50) / 100
@@ -113,7 +138,7 @@ fn eighteen_percent(income: Cents) -> Cents {
 /// Compute the new room a year grants, and whether the dollar limit was known.
 fn new_room_for_year(data: &YearData) -> (Cents, bool) {
     let income_based = eighteen_percent(data.prior_year_earned_income);
-    let (capped, limit_known) = match annual_dollar_limit(data.year) {
+    let (capped, limit_known) = match data.dollar_limit {
         Some(limit) => (income_based.min(limit), true),
         None => (income_based, false),
     };
@@ -140,8 +165,6 @@ pub fn compute(years: &[YearData], opening_unused_room: Cents) -> Vec<YearComput
         let available_room = opening_room + new_room;
         let closing_room = available_room - data.contribution;
 
-        // Over-contribution is measured on the cumulative shortfall beyond the
-        // buffer. closing_room already carries prior years' excess forward.
         let excess = (-closing_room - OVER_CONTRIBUTION_BUFFER).max(0);
         let penalty = excess * MONTHLY_PENALTY_RATE_PERCENT / 100;
 
@@ -171,23 +194,37 @@ mod tests {
         d * 100
     }
 
+    /// Build a YearData with the built-in dollar limit resolved (mirrors how the
+    /// DB layer supplies it in production).
+    fn yd(year: i32, income: Cents, pa: Cents, contribution: Cents) -> YearData {
+        YearData {
+            year,
+            prior_year_earned_income: income,
+            pension_adjustment: pa,
+            contribution,
+            dollar_limit: annual_dollar_limit(year),
+        }
+    }
+
     #[test]
     fn eighteen_percent_rounds_to_nearest_cent() {
-        // 18% of $50,000 = $9,000.00
         assert_eq!(eighteen_percent(dollars(50_000)), dollars(9_000));
-        // 18% of $12,345.67 = $2,222.2206 -> rounds to $2,222.22
         assert_eq!(eighteen_percent(1_234_567), 222_222);
+    }
+
+    #[test]
+    fn built_in_table_covers_2010_onward_with_known_values() {
+        assert_eq!(annual_dollar_limit(2010), Some(dollars(22_000)));
+        assert_eq!(annual_dollar_limit(2015), Some(dollars(24_930)));
+        assert_eq!(annual_dollar_limit(2024), Some(dollars(31_560)));
+        assert_eq!(annual_dollar_limit(2026), Some(dollars(33_810)));
+        assert_eq!(annual_dollar_limit(2009), None); // before the table
     }
 
     #[test]
     fn new_room_is_capped_by_annual_dollar_limit() {
         // 18% of $250,000 = $45,000, but 2024 limit is $31,560.
-        let d = YearData {
-            year: 2024,
-            prior_year_earned_income: dollars(250_000),
-            pension_adjustment: 0,
-            contribution: 0,
-        };
+        let d = yd(2024, dollars(250_000), 0, 0);
         let (room, known) = new_room_for_year(&d);
         assert!(known);
         assert_eq!(room, dollars(31_560));
@@ -196,37 +233,18 @@ mod tests {
     #[test]
     fn pension_adjustment_reduces_new_room() {
         // 18% of $60,000 = $10,800; PA of $4,000 -> $6,800 new room.
-        let d = YearData {
-            year: 2024,
-            prior_year_earned_income: dollars(60_000),
-            pension_adjustment: dollars(4_000),
-            contribution: 0,
-        };
+        let d = yd(2024, dollars(60_000), dollars(4_000), 0);
         let (room, _) = new_room_for_year(&d);
         assert_eq!(room, dollars(6_800));
     }
 
     #[test]
     fn unused_room_carries_forward() {
-        let years = vec![
-            YearData {
-                year: 2023,
-                prior_year_earned_income: dollars(50_000), // 18% = $9,000 (< 2023 cap)
-                pension_adjustment: 0,
-                contribution: dollars(4_000),
-            },
-            YearData {
-                year: 2024,
-                prior_year_earned_income: dollars(50_000), // another $9,000
-                pension_adjustment: 0,
-                contribution: dollars(2_000),
-            },
-        ];
+        let years = vec![yd(2023, dollars(50_000), 0, dollars(4_000)),
+                         yd(2024, dollars(50_000), 0, dollars(2_000))];
         let r = compute(&years, 0);
-        // 2023: room 9,000, contribute 4,000 -> carry 5,000.
         assert_eq!(r[0].available_room, dollars(9_000));
         assert_eq!(r[0].closing_room, dollars(5_000));
-        // 2024: opening 5,000 + new 9,000 = 14,000 available, contribute 2,000.
         assert_eq!(r[1].opening_room, dollars(5_000));
         assert_eq!(r[1].available_room, dollars(14_000));
         assert_eq!(r[1].closing_room, dollars(12_000));
@@ -235,13 +253,7 @@ mod tests {
 
     #[test]
     fn within_2000_buffer_has_no_penalty() {
-        // Room $9,000, contribute $10,500 -> $1,500 over, within the $2,000 buffer.
-        let years = vec![YearData {
-            year: 2024,
-            prior_year_earned_income: dollars(50_000),
-            pension_adjustment: 0,
-            contribution: dollars(10_500),
-        }];
+        let years = vec![yd(2024, dollars(50_000), 0, dollars(10_500))];
         let r = compute(&years, 0);
         assert_eq!(r[0].closing_room, dollars(-1_500));
         assert_eq!(r[0].over_contribution, 0);
@@ -250,28 +262,16 @@ mod tests {
 
     #[test]
     fn excess_beyond_buffer_incurs_one_percent_monthly() {
-        // Room $9,000, contribute $12,000 -> $3,000 over; $1,000 beyond buffer.
-        let years = vec![YearData {
-            year: 2024,
-            prior_year_earned_income: dollars(50_000),
-            pension_adjustment: 0,
-            contribution: dollars(12_000),
-        }];
+        let years = vec![yd(2024, dollars(50_000), 0, dollars(12_000))];
         let r = compute(&years, 0);
         assert_eq!(r[0].closing_room, dollars(-3_000));
         assert_eq!(r[0].over_contribution, dollars(1_000));
-        assert_eq!(r[0].estimated_monthly_penalty, dollars(10)); // 1% of $1,000
+        assert_eq!(r[0].estimated_monthly_penalty, dollars(10));
     }
 
     #[test]
     fn opening_room_from_prior_history_is_respected() {
-        // User carries $20,000 of unused room from before the tracked period.
-        let years = vec![YearData {
-            year: 2024,
-            prior_year_earned_income: dollars(50_000), // +$9,000 new room
-            pension_adjustment: 0,
-            contribution: dollars(25_000),
-        }];
+        let years = vec![yd(2024, dollars(50_000), 0, dollars(25_000))];
         let r = compute(&years, dollars(20_000));
         assert_eq!(r[0].opening_room, dollars(20_000));
         assert_eq!(r[0].available_room, dollars(29_000));
@@ -279,13 +279,28 @@ mod tests {
     }
 
     #[test]
-    fn unknown_year_is_flagged_and_uncapped() {
-        // Year far in the future with no published limit.
+    fn a_user_supplied_limit_overrides_when_built_in_is_absent() {
+        // 2099 has no built-in limit; caller supplies one -> it caps room.
         let d = YearData {
             year: 2099,
             prior_year_earned_income: dollars(300_000),
             pension_adjustment: 0,
             contribution: 0,
+            dollar_limit: Some(dollars(40_000)),
+        };
+        let (room, known) = new_room_for_year(&d);
+        assert!(known);
+        assert_eq!(room, dollars(40_000));
+    }
+
+    #[test]
+    fn unknown_limit_is_flagged_and_uncapped() {
+        let d = YearData {
+            year: 2099,
+            prior_year_earned_income: dollars(300_000),
+            pension_adjustment: 0,
+            contribution: 0,
+            dollar_limit: None,
         };
         let (room, known) = new_room_for_year(&d);
         assert!(!known);
@@ -296,10 +311,7 @@ mod tests {
 
     #[test]
     fn out_of_order_years_are_sorted() {
-        let years = vec![
-            YearData { year: 2024, prior_year_earned_income: dollars(50_000), pension_adjustment: 0, contribution: 0 },
-            YearData { year: 2023, prior_year_earned_income: dollars(50_000), pension_adjustment: 0, contribution: 0 },
-        ];
+        let years = vec![yd(2024, dollars(50_000), 0, 0), yd(2023, dollars(50_000), 0, 0)];
         let r = compute(&years, 0);
         assert_eq!(r[0].year, 2023);
         assert_eq!(r[1].year, 2024);

@@ -35,10 +35,14 @@ left.**
 - 📝 **Logs every contribution** with date, amount, and a note.
 - 🕓 **Keeps a full history of your data** — every change is saved, so you can
   always look back.
+- 👪 **Tracks your whole family** — add each person; everyone gets their own
+  RRSP, TFSA, and FHSA. Switch between them with the “Family member” selector.
 - ☁️ **Optional Google Drive backup** — safe, automatic, and set up in two
   minutes (see below).
 
-> **Available now:** RRSP. **Coming soon:** TFSA and FHSA.
+> **All three accounts are supported:** RRSP, TFSA, and FHSA — each with its own
+> rules (RRSP's income-based room and $2,000 buffer, TFSA's withdrawal
+> re-contribution timing, FHSA's $8k/year and $40k lifetime caps).
 
 ---
 
@@ -66,8 +70,12 @@ app → **Open**. This is normal for indie apps that aren't code-signed.</sub>
 
 ## How to use it
 
-CRAcked builds your contribution room from two things: **your income** (which
-earns you room) and **your contributions** (which use it up). Here's the flow:
+Pick a family member from the **Family member** selector at the top (add more
+with **+ Add**). Each person has their own RRSP, TFSA, and FHSA tabs. The
+**Backup** tab covers everyone at once.
+
+For RRSP, CRAcked builds your contribution room from two things: **your income**
+(which earns you room) and **your contributions** (which use it up). Here's the flow:
 
 ### 1. (Optional) Enter your starting room
 If you've had an RRSP before using this app, open the **Starting room** section
