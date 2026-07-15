@@ -49,12 +49,17 @@ jobs:
         run: cargo test
 
   frontend:
-    name: Frontend (prettier)
+    name: Frontend (prettier, unit + e2e tests)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
       - name: prettier check
-        run: npx --yes prettier@3 --check "src/**/*.{js,css,html}" "*.{json,md}" ".github/**/*.yml"
+        run: npm run format:check
+      - name: Unit + e2e tests (vitest / jsdom)
+        run: npm test

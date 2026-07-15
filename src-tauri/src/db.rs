@@ -39,8 +39,9 @@ pub fn open(path: &PathBuf) -> Result<Connection> {
     Ok(conn)
 }
 
-/// Open an in-memory database (used by tests).
-#[cfg(test)]
+/// Open an in-memory database. Used by the in-crate unit tests and the
+/// out-of-crate integration suite (`tests/integration.rs`) to get a clean,
+/// fully-migrated schema with no filesystem side effects.
 pub fn open_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory()?;
     migrate(&conn)?;
