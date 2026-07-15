@@ -49,19 +49,49 @@ annoying. CRAcked exists to make that dead simple, so you never:
 > CRAcked is designed to model these rules explicitly rather than hard-code a
 > single year.
 
-## Planned features
+## Features
 
-- [ ] Track contributions per account, per year
-- [ ] Compute available room using each account's accrual + carry-forward rules
-- [ ] Model TFSA withdrawal re-contribution timing
+- [x] Track RRSP contributions per year
+- [x] Compute RRSP room (18% accrual, annual dollar-limit cap, unused-room carry-forward)
+- [x] Over-contribution warnings ($2,000 buffer + 1%/month penalty estimate)
+- [x] Local git version history of all data + append-only Google Drive backup
+- [ ] TFSA rules (cumulative room + withdrawal re-contribution timing)
+- [ ] FHSA rules (annual cap, carry-forward, lifetime cap, 15-year window)
 - [ ] Estimate tax refund / deferral from RRSP & FHSA deductions
-- [ ] Over-contribution warnings before you file
 - [ ] Multi-year projections
+
+## Tech stack
+
+- **Desktop:** [Tauri 2](https://tauri.app) — Rust backend, static HTML/CSS/JS UI
+- **Rule engine:** pure Rust (`src-tauri/src/rrsp.rs`), fully unit-tested
+- **Storage:** SQLite (bundled, `src-tauri/src/db.rs`) — money stored as integer cents
+- **Backup:** the data directory is a git repo; `rclone copy` mirrors it
+  append-only to Google Drive (see [`BACKUP.md`](BACKUP.md))
+
+## Running it
+
+Prerequisites: Rust ≥ 1.77, Node, and the Tauri Linux system libraries
+(WebKitGTK etc.).
+
+```bash
+# Dev (hot reload of the Rust side)
+cd src-tauri && cargo tauri dev
+
+# Run the tests
+cd src-tauri && cargo test
+
+# Build a release bundle
+cd src-tauri && cargo tauri build
+```
+
+Your data lives in `~/.local/share/CRAcked/`. To back it up to Google Drive,
+follow the one-time setup in [`BACKUP.md`](BACKUP.md).
 
 ## Status
 
-🚧 Early days — repo just scratched into existence. Starting with the README
-and building out from here.
+🚧 Active development. **RRSP is fully implemented** (tracking, room calculation,
+over-contribution warnings) with local + Google Drive backup working. TFSA and
+FHSA are next.
 
 ## Disclaimer
 
