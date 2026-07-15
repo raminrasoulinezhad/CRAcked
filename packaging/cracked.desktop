@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CRAcked
+GenericName=Contribution Room Tracker
+Comment=Track RRSP/TFSA/FHSA contribution room and claw back your tax
+Exec=__PROJECT_ROOT__/scripts/cracked.sh
+Icon=__PROJECT_ROOT__/packaging/cracked.png
+Terminal=false
+Categories=Office;Finance;
+Keywords=rrsp;tfsa;fhsa;tax;contribution;canada;cra;registered;
+StartupNotify=true
+StartupWMClass=CRAcked

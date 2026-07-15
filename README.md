@@ -68,20 +68,39 @@ annoying. CRAcked exists to make that dead simple, so you never:
 - **Backup:** the data directory is a git repo; `rclone copy` mirrors it
   append-only to Google Drive (see [`BACKUP.md`](BACKUP.md))
 
-## Running it
+## Installing it
+
+CRAcked ships as a **single self-contained installer per OS** — the web engine,
+an embedded git, and a bundled `rclone` are all included, so there's nothing else
+to install. See [`PACKAGING.md`](PACKAGING.md) for downloads and build steps.
+
+- **Windows**: `.exe` / `.msi` — double-click.
+- **macOS**: `.dmg` — drag to Applications.
+- **Linux**: `.AppImage` (portable) or `.deb` (`sudo apt install ./cracked_*.deb`).
+
+Cross-platform installers are produced by the GitHub Actions release workflow
+(`.github/workflows/release.yml`) — tag a release (`git tag v0.1.0 && git push
+origin v0.1.0`) and it builds all three.
+
+### Develop with a live launcher
+
+Install a launcher that runs the app from this repo and rebuilds on each launch,
+so it always reflects your latest code — then find it via the **Super/Windows key**:
+
+```bash
+./scripts/install-desktop.sh
+```
+
+## Running from source
 
 Prerequisites: Rust ≥ 1.77, Node, and the Tauri Linux system libraries
 (WebKitGTK etc.).
 
 ```bash
-# Dev (hot reload of the Rust side)
-cd src-tauri && cargo tauri dev
-
-# Run the tests
-cd src-tauri && cargo test
-
-# Build a release bundle
-cd src-tauri && cargo tauri build
+cd src-tauri && cargo tauri dev     # dev run
+cd src-tauri && cargo test          # tests
+./scripts/fetch-rclone.sh           # grab the rclone sidecar, then:
+cd src-tauri && cargo tauri build   # build an installer for this OS
 ```
 
 Your data lives in `~/.local/share/CRAcked/`. To back it up to Google Drive,

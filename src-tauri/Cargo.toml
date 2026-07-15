@@ -25,4 +25,8 @@ serde_json = "1"
 # `bundled` compiles SQLite from source so there's no system-library dependency.
 rusqlite = { version = "0.32", features = ["bundled"] }
 dirs = "5"
+# Embedded git (vendored libgit2) — no `git` binary needed on the user's machine.
+# default-features off drops the network/https/ssh transports we don't use
+# (backups reach Drive via rclone, not git push), keeping the C dep surface small.
+git2 = { version = "0.19", default-features = false, features = ["vendored-libgit2"] }
 

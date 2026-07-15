@@ -16,8 +16,10 @@
 //! accrues, and the Drive push is simply skipped.
 
 use crate::db;
+use git2::{IndexAddOption, Repository, Signature};
 use rusqlite::Connection;
 use serde::Serialize;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -83,35 +85,25 @@ fn run(cmd: &mut Command) -> std::io::Result<std::process::Output> {
     cmd.output()
 }
 
-/// Ensure the directory is a git repo with a commit identity available.
+/// Ensure the data directory exists (the git repo is created lazily on commit).
 fn ensure_repo(dir: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(dir).map_err(|e| format!("create dir: {e}"))?;
-    if !dir.join(".git").exists() {
-        let out = run(Command::new("git").arg("-C").arg(dir).arg("init").arg("-q"))
-            .map_err(|e| format!("git init: {e}"))?;
-        if !out.status.success() {
-            return Err(format!(
-                "git init failed: {}",
-                String::from_utf8_lossy(&out.stderr)
-            ));
-        }
-    }
-    // Guarantee a commit identity even if the user has no global git config.
-    ensure_local_identity(dir, "user.name", "CRAcked");
-    ensure_local_identity(dir, "user.email", "cracked@localhost");
-    Ok(())
+    std::fs::create_dir_all(dir).map_err(|e| format!("create dir: {e}"))
 }
 
-fn ensure_local_identity(dir: &Path, key: &str, fallback: &str) {
-    let has = run(Command::new("git").arg("-C").arg(dir).args(["config", key]))
-        .map(|o| o.status.success() && !o.stdout.is_empty())
-        .unwrap_or(false);
-    if !has {
-        let _ = run(Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(["config", key, fallback]));
-    }
+/// Open the repo at `dir`, initialising it if it doesn't exist yet.
+fn open_or_init(dir: &Path) -> Result<Repository, String> {
+    std::fs::create_dir_all(dir).map_err(|e| format!("create dir: {e}"))?;
+    Repository::open(dir)
+        .or_else(|_| Repository::init(dir))
+        .map_err(|e| format!("git init/open: {e}"))
+}
+
+/// A commit signature: prefer the repo/global git identity, else a sensible
+/// built-in default (so commits work even on a machine with no git config).
+fn signature(repo: &Repository) -> Result<Signature<'static>, String> {
+    repo.signature()
+        .or_else(|_| Signature::now("CRAcked", "cracked@localhost"))
+        .map_err(|e| format!("signature: {e}"))
 }
 
 /// Write the plain-text snapshot into the repo directory.
@@ -126,43 +118,60 @@ fn write_snapshot(conn: &Connection, dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Stage everything and commit if there is anything to commit.
+/// Stage everything and commit if there is anything to commit. Returns whether
+/// a new commit was actually created (false when nothing changed).
 fn git_commit(dir: &Path, message: &str) -> Result<bool, String> {
-    let add = run(Command::new("git").arg("-C").arg(dir).args(["add", "-A"]))
-        .map_err(|e| format!("git add: {e}"))?;
-    if !add.status.success() {
-        return Err(format!(
-            "git add failed: {}",
-            String::from_utf8_lossy(&add.stderr)
-        ));
+    let repo = open_or_init(dir)?;
+
+    // Stage all files in the working directory.
+    let mut index = repo.index().map_err(|e| format!("index: {e}"))?;
+    index
+        .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
+        .map_err(|e| format!("add_all: {e}"))?;
+    index.write().map_err(|e| format!("index write: {e}"))?;
+    let tree_oid = index.write_tree().map_err(|e| format!("write_tree: {e}"))?;
+    let tree = repo.find_tree(tree_oid).map_err(|e| format!("find_tree: {e}"))?;
+
+    // Find the current HEAD commit, if any, as the parent.
+    let parent = match repo.head() {
+        Ok(head) => Some(head.peel_to_commit().map_err(|e| format!("peel: {e}"))?),
+        Err(_) => None, // unborn HEAD -> this is the first commit
+    };
+
+    // Nothing changed since the last commit? Then don't create an empty one.
+    if let Some(ref p) = parent {
+        if p.tree().map_err(|e| format!("parent tree: {e}"))?.id() == tree_oid {
+            return Ok(false);
+        }
     }
-    // `diff --cached --quiet` exits non-zero when there ARE staged changes.
-    let diff = run(Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["diff", "--cached", "--quiet"]))
-    .map_err(|e| format!("git diff: {e}"))?;
-    if diff.status.success() {
-        return Ok(false); // nothing changed
-    }
-    let commit = run(Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["commit", "-q", "-m", message]))
-    .map_err(|e| format!("git commit: {e}"))?;
-    if !commit.status.success() {
-        return Err(format!(
-            "git commit failed: {}",
-            String::from_utf8_lossy(&commit.stderr)
-        ));
-    }
+
+    let sig = signature(&repo)?;
+    let parents: Vec<&git2::Commit> = parent.iter().collect();
+    repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
+        .map_err(|e| format!("commit: {e}"))?;
     Ok(true)
+}
+
+/// Which `rclone` to invoke: prefer the copy bundled next to the app executable
+/// (the sidecar shipped in the installer), falling back to a system `rclone` on
+/// PATH (handy during development).
+fn rclone_program() -> OsString {
+    let name = if cfg!(windows) { "rclone.exe" } else { "rclone" };
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join(name);
+            if candidate.exists() {
+                return candidate.into_os_string();
+            }
+        }
+    }
+    OsString::from("rclone")
 }
 
 /// Append-only push to Google Drive via `rclone copy` (NEVER `sync`).
 fn rclone_copy(cfg: &BackupConfig) -> (bool, String) {
     let dest = format!("{}:{}", cfg.rclone_remote, cfg.rclone_folder);
-    match run(Command::new("rclone")
+    match run(Command::new(rclone_program())
         .arg("copy")
         .arg(&cfg.dir)
         .arg(&dest)
@@ -221,15 +230,16 @@ pub fn back_up_async(conn: &Connection, cfg: BackupConfig, message: String) {
 mod tests {
     use super::*;
 
-    fn git_available() -> bool {
-        Command::new("git").arg("--version").output().is_ok()
+    /// Count commits reachable from HEAD using the embedded git.
+    fn commit_count(dir: &Path) -> usize {
+        let repo = Repository::open(dir).unwrap();
+        let mut walk = repo.revwalk().unwrap();
+        walk.push_head().unwrap();
+        walk.count()
     }
 
     #[test]
     fn commit_only_when_changed() {
-        if !git_available() {
-            return;
-        }
         let tmp = std::env::temp_dir().join(format!("cracked_test_repo_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         ensure_repo(&tmp).unwrap();
@@ -242,14 +252,7 @@ mod tests {
         std::fs::write(tmp.join("snapshot.json"), "{\"a\":2}").unwrap();
         assert!(git_commit(&tmp, "second").unwrap(), "changed write should commit");
 
-        let log = Command::new("git")
-            .arg("-C")
-            .arg(&tmp)
-            .args(["rev-list", "--count", "HEAD"])
-            .output()
-            .unwrap();
-        let count: i32 = String::from_utf8_lossy(&log.stdout).trim().parse().unwrap();
-        assert_eq!(count, 2, "exactly two commits expected");
+        assert_eq!(commit_count(&tmp), 2, "exactly two commits expected");
 
         let _ = std::fs::remove_dir_all(&tmp);
     }
