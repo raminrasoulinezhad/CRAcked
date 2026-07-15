@@ -33,6 +33,9 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
+      - name: Fetch bundled rclone sidecar
+        run: ./scripts/fetch-rclone.sh x86_64-unknown-linux-gnu
+
       - name: rustfmt
         working-directory: src-tauri
         run: cargo fmt --check
