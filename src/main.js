@@ -119,6 +119,17 @@ function escapeHtml(s) {
   );
 }
 
+async function refreshBackupSettings() {
+  const s = await invoke("get_backup_settings");
+  document.querySelector("#backup-dir").textContent = `Data repo: ${s.dir}`;
+  document.querySelector("#backup-remote").value = s.remote;
+  document.querySelector("#backup-folder").value = s.folder;
+  const status = document.querySelector("#backup-status");
+  status.textContent = s.enabled
+    ? "Google Drive backup is configured."
+    : "Google Drive not configured — local git history only.";
+}
+
 async function refreshAll() {
   await Promise.all([refreshSummary(), refreshIncome(), refreshContributions()]);
 }
@@ -169,9 +180,41 @@ window.addEventListener("DOMContentLoaded", async () => {
     await refreshAll();
   });
 
+  // Save backup settings
+  document.querySelector("#backup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await invoke("set_backup_settings", {
+      remote: document.querySelector("#backup-remote").value || "",
+      folder: document.querySelector("#backup-folder").value || "CRAcked",
+    });
+    await refreshBackupSettings();
+  });
+
+  // Manual "Back up now"
+  document.querySelector("#backup-now-btn").addEventListener("click", async () => {
+    const status = document.querySelector("#backup-status");
+    status.textContent = "Backing up…";
+    try {
+      const r = await invoke("backup_now");
+      const parts = [];
+      parts.push(r.committed ? "Committed new snapshot." : "No changes to commit.");
+      if (r.rclone_attempted) {
+        parts.push(r.rclone_ok ? "Pushed to Google Drive." : `Drive push failed: ${r.rclone_message}`);
+      } else {
+        parts.push(r.rclone_message);
+      }
+      status.textContent = parts.join(" ");
+      status.classList.toggle("warn", r.rclone_attempted && !r.rclone_ok);
+    } catch (err) {
+      status.textContent = `Backup error: ${err}`;
+      status.classList.add("warn");
+    }
+  });
+
   // Load current opening room into the field
   const opening = await invoke("get_rrsp_opening_room");
   document.querySelector("#opening-room").value = (opening / 100).toString();
 
+  await refreshBackupSettings();
   await refreshAll();
 });

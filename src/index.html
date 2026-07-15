@@ -137,6 +137,31 @@
         </form>
       </section>
 
+      <!-- Backup -->
+      <section class="panel">
+        <h2>Backup</h2>
+        <p class="hint">
+          Your data lives in a git repository on this machine (full version history),
+          and is copied <strong>append-only</strong> to Google Drive — deleting files
+          locally can never remove them from the backup. Set up Drive once with
+          <code>rclone config</code> (see <code>BACKUP.md</code>), then enter the remote name below.
+        </p>
+        <p class="mono" id="backup-dir"></p>
+        <form id="backup-form" class="inline">
+          <label>rclone remote <span class="muted">— e.g. gdrive</span>
+            <input type="text" id="backup-remote" placeholder="gdrive" />
+          </label>
+          <label>Drive folder
+            <input type="text" id="backup-folder" placeholder="CRAcked" />
+          </label>
+          <button type="submit">Save backup settings</button>
+        </form>
+        <div class="backup-actions">
+          <button type="button" id="backup-now-btn" class="secondary">Back up now</button>
+          <span id="backup-status" class="muted"></span>
+        </div>
+      </section>
+
       <p class="disclaimer">
         CRAcked is a personal tracking tool, not tax advice. Contribution rules and dollar
         limits are set by the CRA and change over time — always verify against your CRA

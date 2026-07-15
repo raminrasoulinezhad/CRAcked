@@ -273,6 +273,39 @@ button[type="submit"]:hover {
   font-size: 0.9rem;
 }
 
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--panel-2);
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+  font-size: 0.85em;
+}
+.backup-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+button.secondary {
+  background: transparent;
+  color: var(--teal);
+  border: 1px solid var(--teal-dim);
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+button.secondary:hover {
+  background: rgba(31, 157, 153, 0.12);
+}
+
 .disclaimer {
   color: var(--muted);
   font-size: 0.78rem;
