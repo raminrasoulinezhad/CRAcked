@@ -560,19 +560,61 @@
         <section class="panel">
           <h2>Google Drive setup</h2>
           <p class="hint">
-            One-time: run <code>rclone config</code> in a terminal and log into Google (name it
-            <code>gdrive</code>). Full instructions are in <code>BACKUP.md</code>. Then enter the
-            remote here.
+            Optional — mirror your data folder to Google Drive so it survives if this machine is
+            lost. You set it up once in a terminal, then copy two values into the boxes below.
+            Without it, your local git history still keeps a full backup on this machine.
           </p>
-          <form id="backup-form" class="inline">
+
+          <ol class="steps">
+            <li>
+              <span class="step-title">Log <code>rclone</code> into your Google account.</span>
+              Run this in a terminal — in Claude Code, type it with a leading <code>!</code>:
+              <span class="copy-row">
+                <code class="cmd">rclone config</code>
+                <button type="button" class="copy-btn" data-copy="rclone config">Copy</button>
+              </span>
+              <span class="step-hint"
+                >At the prompts: <code>n</code> (new remote) → name it <strong>gdrive</strong> →
+                pick <strong>Google Drive</strong> → leave client id/secret blank → scope
+                <code>3</code> → auto-config <code>y</code> (log in via the browser) → not a team
+                drive → <code>y</code> to confirm → <code>q</code> to quit. Full walkthrough in
+                <code>BACKUP.md</code>.</span
+              >
+            </li>
+            <li>
+              <span class="step-title">Confirm it works.</span>
+              <span class="copy-row">
+                <code class="cmd">rclone lsd gdrive:</code>
+                <button type="button" class="copy-btn" data-copy="rclone lsd gdrive:">Copy</button>
+              </span>
+              <span class="step-hint">If it lists your Drive folders, you're connected.</span>
+            </li>
+            <li>
+              <span class="step-title">Enter these two values below, then click Save.</span>
+            </li>
+          </ol>
+
+          <form id="backup-form" class="inline stacked">
             <label
-              >rclone remote <input type="text" id="backup-remote" placeholder="gdrive"
-            /></label>
+              >rclone remote
+              <input type="text" id="backup-remote" placeholder="gdrive" />
+              <span class="field-help"
+                >Type <strong>gdrive</strong> — the name you gave the remote in step 1.</span
+              ></label
+            >
             <label
-              >Drive folder <input type="text" id="backup-folder" placeholder="CRAcked"
-            /></label>
+              >Drive folder
+              <input type="text" id="backup-folder" placeholder="CRAcked" />
+              <span class="field-help"
+                >Type <strong>CRAcked</strong> (or any name) — created in your Drive
+                automatically.</span
+              ></label
+            >
             <button type="submit">Save backup settings</button>
           </form>
+
+          <p class="dest-preview" id="backup-dest-preview"></p>
+
           <div class="backup-actions">
             <button type="button" id="backup-now-btn" class="secondary">Back up now</button>
             <span id="backup-status" class="muted"></span>

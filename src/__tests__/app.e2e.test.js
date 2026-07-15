@@ -178,3 +178,36 @@ describe("tab switching", () => {
     expect($("#tfsa-body").hidden).toBe(true);
   });
 });
+
+describe("Google Drive setup help", () => {
+  it("prompts for a remote when none is configured", async () => {
+    const app = await boot();
+    app.switchTo("Backup");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const preview = $("#backup-dest-preview").textContent;
+    expect(preview).toContain("No remote set yet");
+  });
+
+  it("previews the remote:folder destination live as the boxes are typed", async () => {
+    const app = await boot();
+    app.switchTo("Backup");
+    await new Promise((r) => setTimeout(r, 0));
+
+    $("#backup-remote").value = "gdrive";
+    $("#backup-remote").dispatchEvent(new Event("input", { bubbles: true }));
+    // Folder defaults to CRAcked when left blank.
+    expect($("#backup-dest-preview").textContent).toContain("gdrive:CRAcked");
+
+    $("#backup-folder").value = "Family";
+    $("#backup-folder").dispatchEvent(new Event("input", { bubbles: true }));
+    expect($("#backup-dest-preview").textContent).toContain("gdrive:Family");
+  });
+
+  it("copy buttons carry the exact setup commands", async () => {
+    await boot();
+    const cmds = [...document.querySelectorAll(".copy-btn")].map((b) => b.dataset.copy);
+    expect(cmds).toContain("rclone config");
+    expect(cmds).toContain("rclone lsd gdrive:");
+  });
+});
