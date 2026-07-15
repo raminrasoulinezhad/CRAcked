@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="CRAcked logo" width="280">
+  <img src="logo.png" alt="CRAcked logo" width="260">
 </p>
 
 <h1 align="center">CRAcked</h1>
@@ -9,112 +9,150 @@
 
 ---
 
-## What is this?
+CRAcked is a simple desktop app that keeps track of your Canadian
+tax-advantaged accounts — **RRSP**, **TFSA**, and **FHSA** — so you always know
+exactly how much you're allowed to contribute, and never get surprised by an
+over-contribution penalty.
 
-**CRAcked** is a personal tracker for Canada's tax-advantaged registered
-accounts — the ones with the confusing, ever-changing contribution rules that
-the CRA would rather you not fully understand:
+The rules the CRA uses to calculate your contribution room are genuinely
+confusing: they build up over years, carry forward, and change annually. CRAcked
+does that math for you and shows you one clear number: **how much room you have
+left.**
 
-- **RRSP** — Registered Retirement Savings Plan
-- **TFSA** — Tax-Free Savings Account
-- **FHSA** — First Home Savings Account
+> 🇨🇦 Your money stays on your computer. Nothing is sent anywhere unless *you*
+> turn on Google Drive backup.
 
-Each account grows your contribution room by a different set of rules —
-annual limits, carry-forwards, income-based accrual, lifetime caps, and
-withdrawal quirks. Miss the details and you either leave room on the table or
-get hit with an over-contribution penalty (1% per month — ouch).
+---
 
-CRAcked keeps a running, accurate picture of **how much room you actually
-have**, **how much you've used**, and **how much tax you're clawing back**.
+## What it does
 
-## Why
+- 📊 **Shows your contribution room at a glance** — one headline number for how
+  much you can still put in.
+- 🧮 **Does the CRA math automatically** — earns new room from your income,
+  carries forward what you didn't use, and adds it all up across years.
+- ⚠️ **Warns you before you over-contribute** — including the $2,000 buffer and
+  the 1%-per-month penalty estimate if you go over.
+- 📝 **Logs every contribution** with date, amount, and a note.
+- 🕓 **Keeps a full history of your data** — every change is saved, so you can
+  always look back.
+- ☁️ **Optional Google Drive backup** — safe, automatic, and set up in two
+  minutes (see below).
 
-The CRA gives every Canadian a set of legal tools to defer or eliminate tax —
-but tracking the room across three accounts, across years, is genuinely
-annoying. CRAcked exists to make that dead simple, so you never:
+> **Available now:** RRSP. **Coming soon:** TFSA and FHSA.
 
-- over-contribute and eat a penalty,
-- under-use room you're legally entitled to, or
-- lose track of carry-forward across years.
+---
 
-## The accounts, at a glance
+## Installing
 
-| Account | Tax treatment | Room grows by | Key caps |
-| --- | --- | --- | --- |
-| **RRSP** | Tax-**deferred** (deduct now, taxed on withdrawal) | 18% of prior-year earned income + unused room | Annual dollar max; over-contribution buffer |
-| **TFSA** | Tax-**free** (no deduction, tax-free growth & withdrawal) | Annual limit + unused room + withdrawals re-added next year | Cumulative lifetime room since eligibility |
-| **FHSA** | Tax-**free for a first home** (deduct now, tax-free qualifying withdrawal) | Annual limit + limited carry-forward | Annual cap; lifetime cap; 15-year window |
+Download the installer for your system and run it — that's the whole setup.
+Everything the app needs is included in the one file.
 
-> Exact numbers change year to year and depend on your personal history —
-> CRAcked is designed to model these rules explicitly rather than hard-code a
-> single year.
+| Your computer | Download this | Then |
+| --- | --- | --- |
+| **Windows** | `CRAcked_..._x64-setup.exe` | Double-click and follow the prompts. |
+| **Mac (Apple Silicon)** | `CRAcked_..._aarch64.dmg` | Open it, drag CRAcked into Applications. |
+| **Mac (Intel)** | `CRAcked_..._x64.dmg` | Open it, drag CRAcked into Applications. |
+| **Linux** | `CRAcked_..._amd64.AppImage` | Make it executable, then double-click. |
+| **Linux (Ubuntu/Debian)** | `CRAcked_..._amd64.deb` | Install with your software centre, or `sudo apt install ./CRAcked_*.deb`. |
 
-## Features
+Once installed, find **CRAcked** in your Start menu (Windows), Launchpad (Mac),
+or app grid (Linux) — press the **Windows key / Command** and type "CRAcked".
 
-- [x] Track RRSP contributions per year
-- [x] Compute RRSP room (18% accrual, annual dollar-limit cap, unused-room carry-forward)
-- [x] Over-contribution warnings ($2,000 buffer + 1%/month penalty estimate)
-- [x] Local git version history of all data + append-only Google Drive backup
-- [ ] TFSA rules (cumulative room + withdrawal re-contribution timing)
-- [ ] FHSA rules (annual cap, carry-forward, lifetime cap, 15-year window)
-- [ ] Estimate tax refund / deferral from RRSP & FHSA deductions
-- [ ] Multi-year projections
+<sub>On Windows you may see a "Windows protected your PC" notice for an unsigned
+app — click **More info → Run anyway**. On Mac, if it won't open, right-click the
+app → **Open**. This is normal for indie apps that aren't code-signed.</sub>
 
-## Tech stack
+---
 
-- **Desktop:** [Tauri 2](https://tauri.app) — Rust backend, static HTML/CSS/JS UI
-- **Rule engine:** pure Rust (`src-tauri/src/rrsp.rs`), fully unit-tested
-- **Storage:** SQLite (bundled, `src-tauri/src/db.rs`) — money stored as integer cents
-- **Backup:** the data directory is a git repo; `rclone copy` mirrors it
-  append-only to Google Drive (see [`BACKUP.md`](BACKUP.md))
+## How to use it
 
-## Installing it
+CRAcked builds your contribution room from two things: **your income** (which
+earns you room) and **your contributions** (which use it up). Here's the flow:
 
-CRAcked ships as a **single self-contained installer per OS** — the web engine,
-an embedded git, and a bundled `rclone` are all included, so there's nothing else
-to install. See [`PACKAGING.md`](PACKAGING.md) for downloads and build steps.
+### 1. (Optional) Enter your starting room
+If you've had an RRSP before using this app, open the **Starting room** section
+and enter the unused room from your latest **CRA Notice of Assessment**. Starting
+fresh? Leave it at $0.
 
-- **Windows**: `.exe` / `.msi` — double-click.
-- **macOS**: `.dmg` — drag to Applications.
-- **Linux**: `.AppImage` (portable) or `.deb` (`sudo apt install ./cracked_*.deb`).
+### 2. Add your earned income, year by year
+In **Annual earned income**, enter what you earned each year.
 
-Cross-platform installers are produced by the GitHub Actions release workflow
-(`.github/workflows/release.yml`) — tag a release (`git tag v0.1.0 && git push
-origin v0.1.0`) and it builds all three.
+> 💡 Income earned in one year gives you room the **following** year. RRSP room =
+> 18% of the prior year's income, up to that year's cap. CRAcked handles this
+> timing for you — just enter each year's income.
 
-### Develop with a live launcher
+### 3. Log your contributions
+In **Add a contribution**, enter the tax year, date, and amount each time you put
+money in. They show up in the **Contribution log**, where you can delete mistakes.
 
-Install a launcher that runs the app from this repo and rebuilds on each launch,
-so it always reflects your latest code — then find it via the **Super/Windows key**:
+### 4. Read your dashboard
+- **Contribution room left** — the big number: what you can still contribute.
+- **Year-by-year room** — how room built up and got used each year.
+- **Warnings** — if you've gone over your limit, CRAcked tells you by how much
+  and the estimated monthly penalty.
 
-```bash
-./scripts/install-desktop.sh
-```
+That's it. Your data saves automatically as you go.
 
-## Running from source
+---
 
-Prerequisites: Rust ≥ 1.77, Node, and the Tauri Linux system libraries
-(WebKitGTK etc.).
+## Setting up Google Drive backup (optional)
 
-```bash
-cd src-tauri && cargo tauri dev     # dev run
-cd src-tauri && cargo test          # tests
-./scripts/fetch-rclone.sh           # grab the rclone sidecar, then:
-cd src-tauri && cargo tauri build   # build an installer for this OS
-```
+By default, your data is saved on your computer with a full history. If you'd
+also like an automatic, safe copy in your own Google Drive, it takes about two
+minutes to set up once.
 
-Your data lives in `~/.local/share/CRAcked/`. To back it up to Google Drive,
-follow the one-time setup in [`BACKUP.md`](BACKUP.md).
+> 🔒 Backups are **append-only**: even if you delete data on your computer, the
+> Drive copy is never removed. Your data is stored on Drive as-is (not
+> encrypted), so keep that folder private to your account.
 
-## Status
+**Quick version:**
 
-🚧 Active development. **RRSP is fully implemented** (tracking, room calculation,
-over-contribution warnings) with local + Google Drive backup working. TFSA and
-FHSA are next.
+1. Open a terminal and run `rclone config` once, then log into your Google
+   account (it opens your browser — just click *Allow*). Name the connection
+   **`gdrive`**.
+   <br><sub>CRAcked bundles rclone for its own backups. If your terminal says
+   `rclone` isn't found, grab the free 2-minute download from
+   [rclone.org/downloads](https://rclone.org/downloads/).</sub>
+2. In CRAcked's **Backup** section, type `gdrive` as the remote and click
+   **Save**, then **Back up now**.
 
-## Disclaimer
+From then on, every change is backed up to a **CRAcked** folder in your Drive
+automatically.
 
-CRAcked is a personal tracking tool, **not** tax advice. Contribution rules
-are set by the Canada Revenue Agency and change over time. Always verify your
-own limits against your CRA My Account and, when in doubt, consult a tax
-professional.
+👉 **Full step-by-step instructions (with every prompt explained) are in
+[BACKUP.md](BACKUP.md).**
+
+### Getting your data back
+Lost your computer or starting on a new one? Install CRAcked, set up the same
+`gdrive` connection, and copy the backup down — your data and its full history
+come right back. See [BACKUP.md](BACKUP.md#restore-new-machine-or-recovering-after-a-wipe).
+
+---
+
+## Where your data lives
+
+Your data is stored in a `CRAcked` folder in your user data directory:
+
+- **Windows**: `%APPDATA%\CRAcked\`
+- **Mac**: `~/Library/Application Support/CRAcked/`
+- **Linux**: `~/.local/share/CRAcked/`
+
+It's a small database file plus a readable `snapshot.json`. You can copy this
+folder anywhere as a manual backup at any time.
+
+---
+
+## Good to know
+
+- **This isn't tax advice.** CRAcked is a personal tracking tool. Contribution
+  rules and dollar limits are set by the CRA and change over time — always check
+  your numbers against your **CRA My Account**, and consult a professional if
+  you're unsure.
+- **Verify the yearly limits.** CRAcked knows the published RRSP dollar limits
+  through recent years and marks any year it's unsure about as an estimate.
+- **Free & private.** No accounts, no tracking, no data leaves your machine
+  unless you turn on Drive backup.
+
+---
+
+<p align="center"><sub>Developer? See <a href="DEVELOPERS_README.md">DEVELOPERS_README.md</a> for how to build and contribute.</sub></p>
