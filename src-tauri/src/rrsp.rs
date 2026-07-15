@@ -46,7 +46,7 @@ pub const MONTHLY_PENALTY_RATE_PERCENT: i64 = 1;
 ///
 /// These are CRA-published figures and **must be correct** — verify before
 /// adding a new year. Source: CRA "MP, DB, RRSP, DPSP, ALDA, TFSA limits".
-/// Verified 2026-07 against taxtips.ca (mirrors the CRA table).
+/// Verified 2026-07-15 against taxtips.ca (mirrors the CRA table). See RULES.md.
 const ANNUAL_DOLLAR_LIMITS: &[(i32, i64)] = &[
     (2010, 22_000),
     (2011, 22_450),

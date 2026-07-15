@@ -157,12 +157,15 @@ folder anywhere as a manual backup at any time.
 
 ## Good to know
 
-- **This isn't tax advice.** CRAcked is a personal tracking tool. Contribution
-  rules and dollar limits are set by the CRA and change over time — always check
-  your numbers against your **CRA My Account**, and consult a professional if
-  you're unsure.
-- **Verify the yearly limits.** CRAcked knows the published RRSP dollar limits
-  through recent years and marks any year it's unsure about as an estimate.
+- **This isn't tax advice.** CRAcked is a personal tracking tool. The rules and
+  dollar limits it applies are those understood **as of the date recorded in
+  [`RULES.md`](RULES.md)** (currently 2026-07-15). The CRA changes these over
+  time; if they change after that date and the app hasn't been updated, it may be
+  wrong — CRAcked accepts no responsibility for that. Always check your numbers
+  against your **CRA My Account**, and consult a professional if unsure.
+- **See exactly what's implemented.** [`RULES.md`](RULES.md) lists every rule,
+  limit table, program start date, and cap the app enforces, with sources and a
+  verification log.
 - **Free & private.** No accounts, no tracking, no data leaves your machine
   unless you turn on Drive backup.
 

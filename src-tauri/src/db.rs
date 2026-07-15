@@ -1037,6 +1037,21 @@ mod tests {
     }
 
     #[test]
+    fn fhsa_current_year_grants_full_room_immediately() {
+        // The current year must be present and grant the full $8,000 the moment
+        // the account is open — FHSA room is not pro-rated by month.
+        let conn = open_in_memory().unwrap();
+        let me = p(&conn);
+        set_fhsa_open_year(&conn, me, 2026).unwrap();
+        let data = fhsa_year_data(&conn, me, 2026).unwrap();
+        let years = crate::fhsa::compute(&data, 2026);
+        let this_year = years.last().unwrap();
+        assert_eq!(this_year.year, 2026);
+        assert_eq!(this_year.new_room, crate::fhsa::ANNUAL_GRANT); // full $8,000, not pro-rated
+        assert_eq!(this_year.available_room, crate::fhsa::ANNUAL_GRANT);
+    }
+
+    #[test]
     fn migrates_a_v1_single_person_database() {
         // Recreate the old (pre multi-person) schema and some data, then migrate.
         let conn = Connection::open_in_memory().unwrap();

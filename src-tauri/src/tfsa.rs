@@ -25,7 +25,7 @@ pub const MONTHLY_PENALTY_RATE_PERCENT: i64 = 1;
 
 /// Published TFSA annual dollar limits, in whole dollars. VERIFY against the CRA
 /// and extend as new years are announced.
-/// Verified 2026-07: cumulative 2009-2026 = $109,000 (matches the CRA figure).
+/// Verified 2026-07-15: cumulative 2009-2026 = $109,000 (matches the CRA figure). See RULES.md.
 const ANNUAL_DOLLAR_LIMITS: &[(i32, i64)] = &[
     (2009, 5_000),
     (2010, 5_000),
