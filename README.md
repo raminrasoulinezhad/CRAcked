@@ -171,4 +171,14 @@ folder anywhere as a manual backup at any time.
 
 ---
 
+## License
+
+CRAcked is licensed under the **Apache License, Version 2.0** — see
+[`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). You're free to use, modify, and
+redistribute it, including commercially, provided you keep the license and
+attribution notices. The software is provided **"as is", without warranties or
+conditions of any kind**.
+
+---
+
 <p align="center"><sub>Developer? See <a href="DEVELOPERS_README.md">DEVELOPERS_README.md</a> for how to build and contribute.</sub></p>

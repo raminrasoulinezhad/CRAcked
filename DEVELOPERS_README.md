@@ -140,6 +140,13 @@ assert the exact published figures.
 with per-family-member tracking, room calculation, over-contribution warnings,
 and local + Google Drive backup. 53 Rust tests; CI + pre-commit enforced.
 
+## License
+
+Apache License, Version 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+Contributions are accepted under the same license: per Apache 2.0 §5, anything
+you intentionally submit for inclusion is licensed under Apache-2.0 unless you
+say otherwise.
+
 ## Disclaimer
 
 CRAcked is a personal tracking tool, **not** tax advice. Contribution rules
